@@ -76,7 +76,7 @@ export const QuickAdd = forwardRef<HTMLInputElement, QuickAddProps>(function Qui
     onAdd({
       ...preview,
       date: manualDate ?? preview.date,
-      dueDate: manualDueDate,
+      dueDate: manualDueDate ?? preview.dueDate,
       time: manualTime,
       projectId: manualProjectId,
       priority: manualPriority,
@@ -102,16 +102,17 @@ export const QuickAdd = forwardRef<HTMLInputElement, QuickAddProps>(function Qui
         className="w-full rounded-2xl border border-quickadd-border bg-quickadd px-4 py-3.5 text-base text-ink placeholder:text-ink/35 shadow-sm outline-none transition-shadow duration-150 focus:border-raspberry/40 focus:ring-2 focus:ring-raspberry/25 dark:text-ink-dark dark:placeholder:text-ink-dark/35"
       />
 
-      {preview && (preview.date || preview.projectPath || preview.tags.length > 0 || preview.recurrence) && (
+      {preview &&
+        (preview.date || preview.dueDate || preview.projectPath || preview.tags.length > 0 || preview.recurrence) && (
         <div className="mt-2 flex flex-wrap items-center gap-2 px-1">
           {preview.date && !manualDate && (
             <span className="rounded-full bg-ink/5 px-2 py-0.5 text-xs text-ink/60 dark:bg-white/10 dark:text-ink-dark/60">
               {preview.date}
             </span>
           )}
-          {manualDueDate && (
+          {(manualDueDate ?? preview.dueDate) && (
             <span className="rounded-full bg-magenta/15 px-2 py-0.5 text-xs font-medium text-magenta">
-              due {manualDueDate}
+              due {manualDueDate ?? preview.dueDate}
             </span>
           )}
           {preview.recurrence && (
@@ -146,7 +147,7 @@ export const QuickAdd = forwardRef<HTMLInputElement, QuickAddProps>(function Qui
         <button
           type="button"
           onClick={() => togglePopover('date')}
-          className={toolbarBtnClass(Boolean(effectiveDate) || Boolean(manualDueDate))}
+          className={toolbarBtnClass(Boolean(effectiveDate) || Boolean(manualDueDate ?? preview?.dueDate))}
           aria-label="Dates"
         >
           <CalendarIcon />

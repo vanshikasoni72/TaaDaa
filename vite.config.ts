@@ -16,15 +16,7 @@ export default defineConfig({
       injectManifest: {
         globPatterns: ['**/*.{js,css,html,svg,png,woff,woff2}'],
       },
-      includeAssets: [
-        'icon.svg',
-        'icon-maskable.svg',
-        'icon-apple.svg',
-        'icon-192.png',
-        'icon-512.png',
-        'icon-maskable-512.png',
-        'apple-touch-icon.png',
-      ],
+      includeAssets: ['icon.svg', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'apple-touch-icon.png'],
       manifest: {
         name: 'TaaDaa',
         short_name: 'TaaDaa',

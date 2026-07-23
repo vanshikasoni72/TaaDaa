@@ -109,7 +109,12 @@ function TaskRow({ task, projects, compact, onToggle, onDelete, onSnooze, onEdit
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
         style={{ transform: `translateX(${dragX}px)`, transition: dragging ? 'none' : 'transform 200ms ease-out' }}
-        className={`group relative flex touch-pan-y items-center gap-3 rounded-xl bg-cream px-3 transition-colors duration-150 hover:bg-ink/[0.03] dark:bg-cream-dark dark:hover:bg-white/[0.04] ${compact ? 'py-1.5' : 'py-2.5'}`}
+        // Hover tint is mixed into a fully opaque solid color (not a translucent
+        // bg-ink/[x%] overlay) — this row sits directly on top of the snooze
+        // reveal panel underneath, so any translucent hover background lets
+        // that panel show through and visually collide with the row's own
+        // content. A solid color-mix keeps the row opaque at every state.
+        className={`group relative flex touch-pan-y items-center gap-3 rounded-xl bg-cream px-3 transition-colors duration-150 hover:bg-[color-mix(in_oklab,var(--color-cream)_97%,var(--color-ink)_3%)] dark:bg-cream-dark dark:hover:bg-[color-mix(in_oklab,var(--color-cream-dark)_96%,white_4%)] ${compact ? 'py-1.5' : 'py-2.5'}`}
       >
         <Checkbox checked={task.done} onChange={onToggle} label={`Mark "${task.title}" done`} />
 
@@ -205,7 +210,10 @@ function TaskRow({ task, projects, compact, onToggle, onDelete, onSnooze, onEdit
             type="button"
             onClick={() => setDragX((x) => (x === 0 ? -REVEAL_WIDTH : 0))}
             aria-label={`Snooze "${task.title}"`}
-            className="hidden shrink-0 text-ink/30 opacity-0 transition-opacity duration-150 hover:text-rose group-hover:opacity-100 focus-visible:opacity-100 sm:block"
+            tabIndex={dragX === 0 ? 0 : -1}
+            className={`hidden shrink-0 text-ink/30 transition-opacity duration-150 hover:text-rose focus-visible:opacity-100 sm:block ${
+              dragX === 0 ? 'opacity-0 group-hover:opacity-100' : 'pointer-events-none opacity-0'
+            }`}
           >
             ⏰
           </button>
@@ -215,7 +223,10 @@ function TaskRow({ task, projects, compact, onToggle, onDelete, onSnooze, onEdit
           type="button"
           onClick={onDelete}
           aria-label={`Delete "${task.title}"`}
-          className="shrink-0 text-ink/30 opacity-0 transition-opacity duration-150 hover:text-raspberry group-hover:opacity-100 focus-visible:opacity-100"
+          tabIndex={dragX === 0 ? 0 : -1}
+          className={`shrink-0 text-ink/30 transition-opacity duration-150 hover:text-raspberry focus-visible:opacity-100 ${
+            dragX === 0 ? 'opacity-0 group-hover:opacity-100' : 'pointer-events-none opacity-0'
+          }`}
         >
           ✕
         </button>

@@ -101,5 +101,12 @@ export function useTasks() {
     setTasks((prev) => prev.filter((t) => t.id !== id && t.parentId !== id))
   }, [])
 
-  return { tasks, addTask, updateTask, toggleTask, deleteTask, restoreTasks, replaceAllTasks }
+  /** Clears projectId on every task belonging to any of the given projects — used when a project is deleted, so its tasks survive as unfiled rather than vanishing or pointing at a dangling id. */
+  const unassignProject = useCallback((projectIds: string[]) => {
+    setTasks((prev) =>
+      prev.map((t) => (t.projectId && projectIds.includes(t.projectId) ? { ...t, projectId: null } : t)),
+    )
+  }, [])
+
+  return { tasks, addTask, updateTask, toggleTask, deleteTask, restoreTasks, replaceAllTasks, unassignProject }
 }

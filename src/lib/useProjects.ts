@@ -112,10 +112,37 @@ export function useProjects() {
     setProjects((prev) => prev.filter((p) => p.id !== id && p.parentId !== id))
   }, [])
 
+  const addProject = useCallback(
+    (name: string): string => {
+      const trimmed = name.trim()
+      const id = crypto.randomUUID()
+      if (!trimmed) return ''
+      setProjects((prev) => {
+        const topLevelCount = prev.filter((p) => p.parentId === null).length
+        const project: Project = {
+          id,
+          name: trimmed,
+          color: colorForNewProject(trimmed, topLevelCount),
+          parentId: null,
+          createdAt: Date.now(),
+        }
+        return [...prev, project]
+      })
+      return id
+    },
+    [],
+  )
+
+  const renameProject = useCallback((id: string, name: string) => {
+    const trimmed = name.trim()
+    if (!trimmed) return
+    setProjects((prev) => prev.map((p) => (p.id === id ? { ...p, name: trimmed } : p)))
+  }, [])
+
   /** Wholesale replace, for pulling a synced snapshot from another device. */
   const replaceAllProjects = useCallback((next: Project[]) => {
     setProjects(next)
   }, [])
 
-  return { projects, resolveProjectPath, deleteProject, replaceAllProjects }
+  return { projects, resolveProjectPath, deleteProject, addProject, renameProject, replaceAllProjects }
 }

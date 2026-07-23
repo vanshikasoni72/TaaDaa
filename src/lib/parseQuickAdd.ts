@@ -6,6 +6,8 @@ import type { Priority, Recurrence, ReminderRule } from '../types'
 export interface ParsedQuickAdd {
   title: string
   date: string | null
+  /** the deadline, parsed from a "due on <date>" / "due by <date>" phrase */
+  dueDate: string | null
   /** raw "@Project" or "@Project/SubCategory" text, not yet resolved to a project id */
   projectPath: string | null
   tags: string[]
@@ -15,8 +17,6 @@ export interface ParsedQuickAdd {
 /** Everything QuickAdd's toolbar can layer on top of the parsed text. */
 export interface QuickAddSubmission extends ParsedQuickAdd {
   time: string | null
-  /** the actual deadline, purely manual — text parsing never sets this, only "date" (work-on) */
-  dueDate: string | null
   /** set via the project dropdown; takes precedence over `projectPath` when resolving */
   projectId: string | null
   priority: Priority | null
@@ -26,6 +26,11 @@ export interface QuickAddSubmission extends ParsedQuickAdd {
 
 const TAG_RE = /#([a-z0-9][a-z0-9-]*)/gi
 const PROJECT_RE = /@([a-z0-9][a-z0-9-]*(?:\/[a-z0-9][a-z0-9-]*)?)/gi
+
+// Only the explicit "due on"/"due by" phrasing triggers a due date — bare
+// "due" alone is too likely to show up in ordinary titles ("pay the fee due
+// to a card issue") to treat as a marker.
+const DUE_MARKER_RE = /\bdue\s+(?:on|by)\s+/i
 
 // chrono treats bare time-of-day words as anchors and can swallow an adjacent
 // relative phrase into a bogus match (e.g. "game night in 3 days" resolves to
@@ -66,6 +71,22 @@ export function parseQuickAdd(input: string): ParsedQuickAdd {
   const { recurrence, impliedWeekday, text: textAfterRecurrence } = parseRecurrence(text)
   text = textAfterRecurrence
 
+  let dueDate: string | null = null
+  const dueMarker = DUE_MARKER_RE.exec(text)
+  if (dueMarker) {
+    const afterMarker = text.slice(dueMarker.index + dueMarker[0].length)
+    const dueResults = chrono
+      .parse(maskAmbiguousTimeWords(afterMarker), new Date(), { forwardDate: true })
+      .filter(hasDateComponent)
+    if (dueResults.length > 0) {
+      const result = dueResults[0]
+      dueDate = toIsoDate(result.start.date())
+      const matchStart = dueMarker.index
+      const matchEnd = dueMarker.index + dueMarker[0].length + result.index + result.text.length
+      text = text.slice(0, matchStart) + text.slice(matchEnd)
+    }
+  }
+
   let date: string | null = null
   const results = chrono
     .parse(maskAmbiguousTimeWords(text), new Date(), { forwardDate: true })
@@ -80,5 +101,5 @@ export function parseQuickAdd(input: string): ParsedQuickAdd {
 
   const title = text.replace(/\s+/g, ' ').trim()
 
-  return { title, date, projectPath, tags, recurrence }
+  return { title, date, dueDate, projectPath, tags, recurrence }
 }

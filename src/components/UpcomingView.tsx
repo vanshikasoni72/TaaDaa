@@ -13,18 +13,26 @@ interface UpcomingViewProps {
   onEditTask: (task: Task) => void
 }
 
+// The earliest of a task's work-on/due dates that's actually in the future —
+// a task can have one, the other, or both set to a future date, and Upcoming
+// sorts by whichever comes first.
+function upcomingSortKey(task: Task, today: string): string {
+  const candidates = [task.date, task.dueDate].filter((d): d is string => d !== null && d > today)
+  return candidates.sort()[0]
+}
+
 export function UpcomingView({ tasks, projects, onToggle, onDelete, onSnooze, onAddSubtask, onEditTask }: UpcomingViewProps) {
   const today = todayIso()
   const topLevel = tasks.filter((t) => t.parentId === null)
   const upcoming = topLevel
-    .filter((t) => t.date && t.date > today)
-    .sort((a, b) => a.date!.localeCompare(b.date!))
+    .filter((t) => (t.date && t.date > today) || (t.dueDate && t.dueDate > today))
+    .sort((a, b) => upcomingSortKey(a, today).localeCompare(upcomingSortKey(b, today)))
 
   return (
     <div>
       <header className="mb-6">
         <h1 className="font-serif text-4xl italic text-heading">Upcoming</h1>
-        <p className="mt-1 text-sm text-ink/50 dark:text-ink-dark/50">everything after today</p>
+        <p className="mt-1 text-sm text-ink/50 dark:text-ink-dark/50">what's coming, date-wise</p>
       </header>
 
       {upcoming.length === 0 ? (

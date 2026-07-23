@@ -13,8 +13,11 @@ interface InboxViewProps {
 }
 
 export function InboxView({ tasks, projects, onToggle, onDelete, onSnooze, onAddSubtask, onEditTask }: InboxViewProps) {
+  // Pure capture bucket: no project AND no date at all — the moment either
+  // gets set, the task belongs to a planning view (Today/Upcoming/Home)
+  // instead, not here.
   const inbox = tasks
-    .filter((t) => t.parentId === null && t.projectId === null)
+    .filter((t) => t.parentId === null && t.projectId === null && t.date === null && t.dueDate === null)
     .sort((a, b) => b.createdAt - a.createdAt)
 
   return (

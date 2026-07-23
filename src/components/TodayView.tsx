@@ -69,14 +69,16 @@ export function TodayView({ tasks, projects, onToggle, onDelete, onSnooze, onAdd
   const today = todayIso()
   const topLevel = tasks.filter((t) => t.parentId === null)
 
-  // "yesterday's problem" keys off the due date (the actual deadline), not
-  // the work-on date — see the Home view for the same convention.
-  const overdue = topLevel.filter((t) => !t.done && t.dueDate && t.dueDate < today)
-  const dueToday = topLevel.filter((t) => t.date === today)
-  const upcoming = topLevel
-    .filter((t) => t.date && t.date > today)
-    .sort((a, b) => a.date!.localeCompare(b.date!))
-  const unscheduled = topLevel.filter((t) => t.date === null)
+  // "yesterday's problem" here means either date could have slipped — a
+  // work-on date left in the past, or a real deadline that's passed —
+  // so nothing that needed attention by now falls through the cracks.
+  const overdue = topLevel.filter(
+    (t) => !t.done && ((t.date && t.date < today) || (t.dueDate && t.dueDate < today)),
+  )
+  const overdueIds = new Set(overdue.map((t) => t.id))
+  // Today is strictly the work-on date — a pure "what am I doing today" list,
+  // distinct from Upcoming (future) and Home (project-grouped week view).
+  const dueToday = topLevel.filter((t) => t.date === today && !overdueIds.has(t.id))
 
   if (topLevel.length === 0) {
     return (
@@ -89,8 +91,7 @@ export function TodayView({ tasks, projects, onToggle, onDelete, onSnooze, onAdd
     )
   }
 
-  const allDone = topLevel.every((t) => t.done)
-  if (allDone) {
+  if (overdue.length === 0 && dueToday.length === 0) {
     return (
       <div>
         <Header />
@@ -109,8 +110,6 @@ export function TodayView({ tasks, projects, onToggle, onDelete, onSnooze, onAdd
       <div className="flex flex-col gap-6">
         <Section title="yesterday's problem" tasks={overdue} {...sectionProps} />
         <Section title="today" tasks={dueToday} {...sectionProps} />
-        <Section title="upcoming" tasks={upcoming} {...sectionProps} />
-        <Section title="whenever" tasks={unscheduled} {...sectionProps} />
       </div>
     </div>
   )

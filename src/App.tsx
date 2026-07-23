@@ -7,7 +7,6 @@ import { UpcomingView } from './components/UpcomingView'
 import { CalendarView } from './components/CalendarView'
 import { ProjectView } from './components/ProjectView'
 import { Sidebar } from './components/Sidebar'
-import { ThemeToggle } from './components/ThemeToggle'
 import { Toast } from './components/Toast'
 import { TaskEditModal } from './components/TaskEditModal'
 import { useTasks } from './lib/useTasks'
@@ -18,6 +17,7 @@ import { parseQuickAdd, type ParsedQuickAdd, type QuickAddSubmission } from './l
 import { readSharedText } from './lib/shareTarget'
 import { syncReminders } from './lib/push'
 import { getStoredSyncCode, pullSync, pushSync } from './lib/sync'
+import { todayIso } from './lib/date'
 import type { Task } from './types'
 import type { ViewState } from './lib/viewState'
 
@@ -30,14 +30,17 @@ interface ToastState {
 const TOAST_DURATION_MS = 4500
 
 function App() {
-  const { tasks, addTask, updateTask, toggleTask, deleteTask, restoreTasks, replaceAllTasks } = useTasks()
-  const { projects, resolveProjectPath, replaceAllProjects } = useProjects()
+  const { tasks, addTask, updateTask, toggleTask, deleteTask, restoreTasks, replaceAllTasks, unassignProject } =
+    useTasks()
+  const { projects, resolveProjectPath, deleteProject, addProject, renameProject, replaceAllProjects } =
+    useProjects()
   const { pref, setTheme } = useTheme()
   const [view, setView] = useState<ViewState>({ kind: 'home' })
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [toast, setToast] = useState<ToastState | null>(null)
   const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [syncing, setSyncing] = useState(false)
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState(todayIso())
   const quickAddRef = useRef<HTMLInputElement>(null)
 
   useQuickAddShortcut(quickAddRef)
@@ -104,12 +107,19 @@ function App() {
   }, [tasks, projects])
 
   function handleAdd(submission: QuickAddSubmission) {
-    const projectId = submission.projectId ?? (submission.projectPath ? resolveProjectPath(submission.projectPath) : null)
+    const projectId =
+      submission.projectId ??
+      (submission.projectPath ? resolveProjectPath(submission.projectPath) : null) ??
+      (view.kind === 'project' ? view.projectId : null)
+    // A day selected on the calendar becomes the new task's deadline, not its
+    // work-on date — the calendar is date-driven, but "I clicked this day and
+    // added a task" reads as "this is due then," not "work on this then."
+    const dueDate = submission.dueDate ?? (view.kind === 'calendar' ? selectedCalendarDate : null)
     addTask({
       title: submission.title,
       date: submission.date,
       time: submission.time,
-      dueDate: submission.dueDate,
+      dueDate,
       projectId,
       priority: submission.priority,
       tags: submission.tags,
@@ -124,11 +134,29 @@ function App() {
     addTask({
       title: parsed.title,
       date: parsed.date,
+      dueDate: parsed.dueDate,
       tags: parsed.tags,
       recurrence: parsed.recurrence,
       projectId,
       parentId,
     })
+  }
+
+  function handleDeleteProject(id: string) {
+    const project = projects.find((p) => p.id === id)
+    if (!project) return
+    const confirmed = window.confirm(
+      project.parentId
+        ? `Delete "${project.name}"? Its tasks stay, just unfiled.`
+        : `Delete "${project.name}" and any of its sub-categories? Their tasks stay, just unfiled.`,
+    )
+    if (!confirmed) return
+    const affectedIds = project.parentId
+      ? [id]
+      : [id, ...projects.filter((p) => p.parentId === id).map((p) => p.id)]
+    unassignProject(affectedIds)
+    deleteProject(id)
+    if (view.kind === 'project' && affectedIds.includes(view.projectId)) setView({ kind: 'home' })
   }
 
   function handleToggle(id: string) {
@@ -247,6 +275,8 @@ function App() {
           <CalendarView
             tasks={tasks}
             projects={projects}
+            selected={selectedCalendarDate}
+            onSelectDate={setSelectedCalendarDate}
             onToggle={handleToggle}
             onDelete={handleDelete}
             onSnooze={handleSnooze}
@@ -283,6 +313,11 @@ function App() {
           onNavigate={navigate}
           onReplaceTasks={replaceAllTasks}
           onReplaceProjects={replaceAllProjects}
+          onAddProject={addProject}
+          onRenameProject={renameProject}
+          onDeleteProject={handleDeleteProject}
+          themePref={pref}
+          onThemeChange={setTheme}
         />
       </aside>
 
@@ -297,6 +332,11 @@ function App() {
               onNavigate={navigate}
               onReplaceTasks={replaceAllTasks}
               onReplaceProjects={replaceAllProjects}
+              onAddProject={addProject}
+              onRenameProject={renameProject}
+              onDeleteProject={handleDeleteProject}
+              themePref={pref}
+              onThemeChange={setTheme}
             />
           </aside>
         </div>
@@ -314,7 +354,6 @@ function App() {
               ☰
             </button>
             {syncing && <p className="text-xs text-ink/40 dark:text-ink-dark/40">syncing…</p>}
-            <ThemeToggle pref={pref} onChange={setTheme} />
           </div>
 
           <main>{renderMain()}</main>

@@ -22,6 +22,8 @@ type Layout = 'week' | 'month'
 interface CalendarViewProps {
   tasks: Task[]
   projects: Project[]
+  selected: string
+  onSelectDate: (iso: string) => void
   onToggle: (id: string) => void
   onDelete: (id: string) => void
   onSnooze: (id: string, days: 1 | 7) => void
@@ -111,12 +113,21 @@ function DayCell({ day, projects, isSelected, isToday, showWeekday, maxTitles, c
 
 const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
-export function CalendarView({ tasks, projects, onToggle, onDelete, onSnooze, onAddSubtask, onEditTask }: CalendarViewProps) {
+export function CalendarView({
+  tasks,
+  projects,
+  selected,
+  onSelectDate,
+  onToggle,
+  onDelete,
+  onSnooze,
+  onAddSubtask,
+  onEditTask,
+}: CalendarViewProps) {
   const today = todayIso()
   const [layout, setLayout] = useState<Layout>('week')
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()))
   const [monthAnchor, setMonthAnchor] = useState(() => startOfMonth(new Date()))
-  const [selected, setSelected] = useState(today)
   const [noteOpen, setNoteOpen] = useState(false)
   const { notes, setNoteForDay } = useDayNotes()
 
@@ -155,21 +166,21 @@ export function CalendarView({ tasks, projects, onToggle, onDelete, onSnooze, on
       setWeekStart(next)
       const nextEndIso = toIsoDate(addDays(next, 6))
       const nextStartIso = toIsoDate(next)
-      setSelected(today >= nextStartIso && today <= nextEndIso ? today : nextStartIso)
+      onSelectDate(today >= nextStartIso && today <= nextEndIso ? today : nextStartIso)
     } else {
       const next = addMonths(monthAnchor, delta)
       setMonthAnchor(next)
       const todayDate = new Date()
       const monthHasToday =
         todayDate.getFullYear() === next.getFullYear() && todayDate.getMonth() === next.getMonth()
-      setSelected(monthHasToday ? today : toIsoDate(next))
+      onSelectDate(monthHasToday ? today : toIsoDate(next))
     }
   }
 
   function goToToday() {
     setWeekStart(startOfWeek(new Date()))
     setMonthAnchor(startOfMonth(new Date()))
-    setSelected(today)
+    onSelectDate(today)
   }
 
   const headerLabel =
@@ -255,7 +266,7 @@ export function CalendarView({ tasks, projects, onToggle, onDelete, onSnooze, on
             showWeekday={layout === 'week'}
             maxTitles={layout === 'week' ? 4 : 2}
             compact={layout === 'month'}
-            onSelect={() => setSelected(day.iso)}
+            onSelect={() => onSelectDate(day.iso)}
           />
         ))}
       </div>
