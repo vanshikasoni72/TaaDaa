@@ -22,5 +22,5 @@ export function applyThemeClass(pref: ThemePref) {
   document.documentElement.classList.toggle('dark', dark)
 
   const meta = document.querySelector('meta[name="theme-color"]')
-  if (meta) meta.setAttribute('content', dark ? '#241019' : '#FAD6D5')
+  if (meta) meta.setAttribute('content', dark ? '#141416' : '#FAD6D5')
 }
