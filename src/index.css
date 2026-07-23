@@ -1,0 +1,104 @@
+@import 'tailwindcss';
+@import '@fontsource/inter/400.css';
+@import '@fontsource/inter/500.css';
+@import '@fontsource/inter/600.css';
+@import '@fontsource/fraunces/500-italic.css';
+@import '@fontsource/fraunces/600.css';
+
+/* Manual theme toggle: dark mode is driven by a `.dark` class on <html>
+   (set in index.html before paint, and kept in sync by useTheme), not
+   solely by prefers-color-scheme. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* "Raspberry Moon" palette. Exact hex values from the spec, non-negotiable. */
+@theme {
+  --color-cream: #fad6d5;
+  --color-cream-dark: #241019;
+  --color-ink: #2b2a28;
+  --color-ink-dark: #f2ede6;
+  --color-raspberry: #ad1357;
+  --color-rose: #cc698f;
+  --color-softpink: #ffd4e4;
+  --color-berry: #b44c75;
+  --color-dustyrose: #c4707a;
+  --color-magenta: #de2776;
+  --color-blush: #ffd4d4;
+
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-serif: 'Fraunces', ui-serif, Georgia, serif;
+}
+
+/* Same accents in dark mode, slightly desaturated/lightened so they don't
+   glow harshly against the plum-charcoal base. */
+.dark {
+  --color-raspberry: #c04b7c;
+  --color-rose: #d68aa8;
+  --color-softpink: #3a1f2a;
+  --color-berry: #c17a94;
+  --color-dustyrose: #cf8b9a;
+  --color-magenta: #e35f96;
+  --color-blush: #35202a;
+}
+
+html {
+  color-scheme: light dark;
+}
+
+body {
+  margin: 0;
+  min-height: 100svh;
+  background-color: var(--color-cream);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+.dark body {
+  background-color: var(--color-cream-dark);
+  color: var(--color-ink-dark);
+}
+
+.calendar-texture {
+  background-image: radial-gradient(circle, rgba(43, 42, 40, 0.06) 1px, transparent 1px);
+  background-size: 18px 18px;
+}
+
+.dark .calendar-texture {
+  background-image: radial-gradient(circle, rgba(242, 237, 230, 0.06) 1px, transparent 1px);
+}
+
+/* Motion tiers used throughout: 150ms hover/focus feedback, 300ms discrete
+   state changes (selection, checkbox, toasts), 500ms deliberate emphasis
+   (task-completion fade). These two keyframes are the deliberate exceptions
+   — a springy overshoot for tactile feel — everything else uses Tailwind's
+   default transition utilities so easing stays consistent app-wide. */
+@keyframes check-pop {
+  0% {
+    transform: scale(0.85);
+  }
+  60% {
+    transform: scale(1.08);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.animate-check-pop {
+  animation: check-pop 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes toast-in {
+  from {
+    transform: translateY(8px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-toast-in {
+  animation: toast-in 300ms ease-out;
+}
