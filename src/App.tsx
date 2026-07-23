@@ -13,7 +13,8 @@ import { Toast } from './components/Toast'
 import { TaskEditModal } from './components/TaskEditModal'
 import { NeonSnakeModal } from './components/NeonSnakeModal'
 import { TetrisModal } from './components/TetrisModal'
-import { SnakeIcon, TetrisIcon } from './components/icons'
+import { ShoppingDrawer } from './components/ShoppingDrawer'
+import { SnakeIcon, TetrisIcon, ShoppingBagIcon } from './components/icons'
 import { useTasks } from './lib/useTasks'
 import { useProjects } from './lib/useProjects'
 import { useTheme } from './lib/useTheme'
@@ -58,6 +59,7 @@ function App() {
   const [selectedCalendarDate, setSelectedCalendarDate] = useState(todayIso())
   const [isSnakeOpen, setIsSnakeOpen] = useState(false)
   const [isTetrisOpen, setIsTetrisOpen] = useState(false)
+  const [isShoppingOpen, setIsShoppingOpen] = useState(false)
   const quickAddRef = useRef<HTMLInputElement>(null)
   // Dragging a task onto a calendar day sets its work-on date, or (holding
   // Shift through the drop) its due date instead — mirrors the modifier-key
@@ -443,6 +445,14 @@ function App() {
               {syncing && <p className="text-xs text-ink/40 dark:text-ink-dark/40">syncing…</p>}
               <button
                 type="button"
+                onClick={() => setIsShoppingOpen(true)}
+                aria-label="Open shopping list"
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-ink/40 transition-colors duration-150 hover:bg-ink/5 hover:text-ink/70 dark:text-ink-dark/40 dark:hover:bg-white/5 dark:hover:text-ink-dark/70"
+              >
+                <ShoppingBagIcon />
+              </button>
+              <button
+                type="button"
                 onClick={() => handleCommand('snake')}
                 aria-label="Play Snake"
                 className="hidden h-8 w-8 items-center justify-center rounded-lg text-raspberry/70 transition-colors duration-150 hover:bg-ink/5 hover:text-raspberry sm:flex dark:hover:bg-white/5"
@@ -494,6 +504,7 @@ function App() {
 
       {isSnakeOpen && <NeonSnakeModal onClose={() => setIsSnakeOpen(false)} />}
       {isTetrisOpen && <TetrisModal onClose={() => setIsTetrisOpen(false)} />}
+      {isShoppingOpen && <ShoppingDrawer onClose={() => setIsShoppingOpen(false)} />}
     </div>
     </DndContext>
   )
