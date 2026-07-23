@@ -9,6 +9,8 @@ interface QuickAddProps {
   projects: Project[]
   existingTags?: string[]
   onAdd: (input: QuickAddSubmission) => void
+  /** Fires instead of onAdd when the input is exactly "snake" or "tetris" — the easter-egg game trigger. */
+  onCommand?: (cmd: 'snake' | 'tetris') => void
 }
 
 type Popover = 'date' | 'time' | 'priority' | 'reminder' | 'note' | 'project' | null
@@ -32,7 +34,7 @@ const fieldClass =
   'w-full rounded-lg border border-ink/10 bg-white/60 px-2 py-1.5 text-sm text-ink outline-none focus:border-raspberry/40 dark:border-border dark:bg-transparent dark:text-ink-dark'
 
 export const QuickAdd = forwardRef<HTMLInputElement, QuickAddProps>(function QuickAdd(
-  { projects, existingTags = [], onAdd },
+  { projects, existingTags = [], onAdd, onCommand },
   ref,
 ) {
   const [value, setValue] = useState('')
@@ -112,6 +114,13 @@ export const QuickAdd = forwardRef<HTMLInputElement, QuickAddProps>(function Qui
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    const normalized = value.toLowerCase().trim()
+    if ((normalized === 'snake' || normalized === 'tetris') && onCommand) {
+      onCommand(normalized)
+      setValue('')
+      resetToolbar()
+      return
+    }
     if (!preview || !preview.title) return
     onAdd({
       ...preview,

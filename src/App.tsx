@@ -11,6 +11,9 @@ import { ProjectView } from './components/ProjectView'
 import { Sidebar } from './components/Sidebar'
 import { Toast } from './components/Toast'
 import { TaskEditModal } from './components/TaskEditModal'
+import { NeonSnakeModal } from './components/NeonSnakeModal'
+import { TetrisModal } from './components/TetrisModal'
+import { SnakeIcon, TetrisIcon } from './components/icons'
 import { useTasks } from './lib/useTasks'
 import { useProjects } from './lib/useProjects'
 import { useTheme } from './lib/useTheme'
@@ -27,7 +30,7 @@ import type { ViewState } from './lib/viewState'
 interface ToastState {
   id: number
   message: string
-  onUndo: () => void
+  onUndo?: () => void
 }
 
 const TOAST_DURATION_MS = 4500
@@ -53,6 +56,8 @@ function App() {
   const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [syncing, setSyncing] = useState(false)
   const [selectedCalendarDate, setSelectedCalendarDate] = useState(todayIso())
+  const [isSnakeOpen, setIsSnakeOpen] = useState(false)
+  const [isTetrisOpen, setIsTetrisOpen] = useState(false)
   const quickAddRef = useRef<HTMLInputElement>(null)
   // Dragging a task onto a calendar day sets its work-on date, or (holding
   // Shift through the drop) its due date instead — mirrors the modifier-key
@@ -198,6 +203,15 @@ function App() {
       note: submission.note,
       recurrence: submission.recurrence,
     })
+  }
+
+  function handleCommand(cmd: 'snake' | 'tetris') {
+    if (window.innerWidth < 768) {
+      setToast({ id: Date.now(), message: 'Desktop feature only' })
+      return
+    }
+    if (cmd === 'snake') setIsSnakeOpen(true)
+    else setIsTetrisOpen(true)
   }
 
   function handleAddSubtask(parentId: string, parsed: ParsedQuickAdd) {
@@ -425,7 +439,25 @@ function App() {
             >
               ☰
             </button>
-            {syncing && <p className="text-xs text-ink/40 dark:text-ink-dark/40">syncing…</p>}
+            <div className="ml-auto flex items-center gap-2">
+              {syncing && <p className="text-xs text-ink/40 dark:text-ink-dark/40">syncing…</p>}
+              <button
+                type="button"
+                onClick={() => handleCommand('snake')}
+                aria-label="Play Snake"
+                className="hidden h-8 w-8 items-center justify-center rounded-lg text-raspberry/70 transition-colors duration-150 hover:bg-ink/5 hover:text-raspberry sm:flex dark:hover:bg-white/5"
+              >
+                <SnakeIcon />
+              </button>
+              <button
+                type="button"
+                onClick={() => handleCommand('tetris')}
+                aria-label="Play Tetris"
+                className="hidden h-8 w-8 items-center justify-center rounded-lg text-ink/40 transition-colors duration-150 hover:bg-ink/5 sm:flex dark:hover:bg-white/5"
+              >
+                <TetrisIcon />
+              </button>
+            </div>
           </div>
 
           <main>{renderMain()}</main>
@@ -447,12 +479,21 @@ function App() {
 
         <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-cream/95 px-4 py-3 backdrop-blur-sm sm:left-56 sm:px-6 dark:border-white/[0.08] dark:bg-cream-dark/85 dark:backdrop-blur-lg">
           <div className={`mx-auto w-full ${view.kind === 'calendar' ? 'max-w-5xl' : 'max-w-xl'}`}>
-            <QuickAdd ref={quickAddRef} projects={projects} existingTags={existingTags} onAdd={handleAdd} />
+            <QuickAdd
+              ref={quickAddRef}
+              projects={projects}
+              existingTags={existingTags}
+              onAdd={handleAdd}
+              onCommand={handleCommand}
+            />
           </div>
         </div>
 
         {toast && <Toast key={toast.id} message={toast.message} onUndo={toast.onUndo} />}
       </div>
+
+      {isSnakeOpen && <NeonSnakeModal onClose={() => setIsSnakeOpen(false)} />}
+      {isTetrisOpen && <TetrisModal onClose={() => setIsTetrisOpen(false)} />}
     </div>
     </DndContext>
   )

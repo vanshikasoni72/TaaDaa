@@ -86,3 +86,28 @@ export function GripIcon({ size = 14, className }: IconProps) {
   )
 }
 
+/** A curled, segmented tail — the Snake game trigger. Opacity fades along the segments toward the tip. */
+export function SnakeIcon({ size = 18, className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} className={className}>
+      <circle cx="6" cy="18" r="2.4" fill="currentColor" opacity="1" />
+      <circle cx="6" cy="12" r="2.2" fill="currentColor" opacity="0.8" />
+      <circle cx="9" cy="7.5" r="2" fill="currentColor" opacity="0.6" />
+      <circle cx="14" cy="6" r="1.8" fill="currentColor" opacity="0.42" />
+      <circle cx="18.5" cy="8.5" r="1.5" fill="currentColor" opacity="0.25" />
+    </svg>
+  )
+}
+
+/** A small cluster of 3-4 tetromino blocks in the three accent colors — the Tetris game trigger. */
+export function TetrisIcon({ size = 18, className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} className={className}>
+      <rect x="3" y="3" width="7" height="7" rx="1.5" fill="#D63C7A" />
+      <rect x="12" y="3" width="7" height="7" rx="1.5" fill="#E39BC4" />
+      <rect x="3" y="12" width="7" height="7" rx="1.5" fill="#4FBDAE" />
+      <rect x="12" y="12" width="7" height="7" rx="1.5" fill="#D63C7A" />
+    </svg>
+  )
+}
+
