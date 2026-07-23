@@ -16,6 +16,7 @@ import { useQuickAddShortcut } from './lib/useQuickAddShortcut'
 import { parseQuickAdd, type ParsedQuickAdd, type QuickAddSubmission } from './lib/parseQuickAdd'
 import { readSharedText } from './lib/shareTarget'
 import { syncReminders } from './lib/push'
+import { getStoredSyncCode, pullSync, pushSync } from './lib/sync'
 import type { Task } from './types'
 import type { ViewState } from './lib/viewState'
 
@@ -28,13 +29,14 @@ interface ToastState {
 const TOAST_DURATION_MS = 4500
 
 function App() {
-  const { tasks, addTask, updateTask, toggleTask, deleteTask, restoreTasks } = useTasks()
-  const { projects, resolveProjectPath } = useProjects()
+  const { tasks, addTask, updateTask, toggleTask, deleteTask, restoreTasks, replaceAllTasks } = useTasks()
+  const { projects, resolveProjectPath, replaceAllProjects } = useProjects()
   const { pref, setTheme } = useTheme()
   const [view, setView] = useState<ViewState>({ kind: 'home' })
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [toast, setToast] = useState<ToastState | null>(null)
   const [editingTask, setEditingTask] = useState<Task | null>(null)
+  const [syncing, setSyncing] = useState(false)
   const quickAddRef = useRef<HTMLInputElement>(null)
 
   useQuickAddShortcut(quickAddRef)
@@ -58,6 +60,27 @@ function App() {
   useEffect(() => {
     syncReminders(tasks)
   }, [tasks])
+
+  useEffect(() => {
+    const code = getStoredSyncCode()
+    if (!code) return
+    setSyncing(true)
+    pullSync(code).then((data) => {
+      if (data) {
+        replaceAllTasks(data.tasks)
+        replaceAllProjects(data.projects)
+      }
+      setSyncing(false)
+    })
+    // deliberately run once on mount only
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    const code = getStoredSyncCode()
+    if (!code) return
+    pushSync(code, tasks, projects)
+  }, [tasks, projects])
 
   function handleAdd(submission: QuickAddSubmission) {
     const projectId = submission.projectId ?? (submission.projectPath ? resolveProjectPath(submission.projectPath) : null)
@@ -195,14 +218,28 @@ function App() {
   return (
     <div className="flex min-h-svh">
       <aside className="hidden w-56 shrink-0 border-r border-ink/10 sm:block dark:border-white/10">
-        <Sidebar projects={projects} tasks={tasks} view={view} onNavigate={navigate} />
+        <Sidebar
+          projects={projects}
+          tasks={tasks}
+          view={view}
+          onNavigate={navigate}
+          onReplaceTasks={replaceAllTasks}
+          onReplaceProjects={replaceAllProjects}
+        />
       </aside>
 
       {mobileMenuOpen && (
         <div className="fixed inset-0 z-40 sm:hidden">
           <div className="absolute inset-0 bg-ink/40 dark:bg-black/60" onClick={() => setMobileMenuOpen(false)} />
           <aside className="relative z-10 h-full w-64 bg-cream shadow-xl dark:bg-cream-dark">
-            <Sidebar projects={projects} tasks={tasks} view={view} onNavigate={navigate} />
+            <Sidebar
+          projects={projects}
+          tasks={tasks}
+          view={view}
+          onNavigate={navigate}
+          onReplaceTasks={replaceAllTasks}
+          onReplaceProjects={replaceAllProjects}
+        />
           </aside>
         </div>
       )}
@@ -217,6 +254,7 @@ function App() {
           >
             ☰
           </button>
+          {syncing && <p className="text-xs text-ink/40 dark:text-ink-dark/40">syncing…</p>}
           <ThemeToggle pref={pref} onChange={setTheme} />
         </div>
 

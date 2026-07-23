@@ -78,5 +78,10 @@ export function useProjects() {
     setProjects((prev) => prev.filter((p) => p.id !== id && p.parentId !== id))
   }, [])
 
-  return { projects, resolveProjectPath, deleteProject }
+  /** Wholesale replace, for pulling a synced snapshot from another device. */
+  const replaceAllProjects = useCallback((next: Project[]) => {
+    setProjects(next)
+  }, [])
+
+  return { projects, resolveProjectPath, deleteProject, replaceAllProjects }
 }

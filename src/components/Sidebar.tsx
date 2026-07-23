@@ -3,12 +3,15 @@ import type { Project, Task } from '../types'
 import { displayColorFor } from '../lib/projectColors'
 import type { ViewState } from '../lib/viewState'
 import { NotificationToggle } from './NotificationToggle'
+import { SyncSettings } from './SyncSettings'
 
 interface SidebarProps {
   projects: Project[]
   tasks: Task[]
   view: ViewState
   onNavigate: (view: ViewState) => void
+  onReplaceTasks: (tasks: Task[]) => void
+  onReplaceProjects: (projects: Project[]) => void
 }
 
 const PINNED: { label: string; view: ViewState }[] = [
@@ -24,7 +27,7 @@ function isSameView(a: ViewState, b: ViewState): boolean {
   return true
 }
 
-export function Sidebar({ projects, tasks, view, onNavigate }: SidebarProps) {
+export function Sidebar({ projects, tasks, view, onNavigate, onReplaceTasks, onReplaceProjects }: SidebarProps) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
 
   const topLevel = projects.filter((p) => p.parentId === null)
@@ -131,7 +134,13 @@ export function Sidebar({ projects, tasks, view, onNavigate }: SidebarProps) {
         </div>
       )}
 
-      <div className="mt-auto pt-4">
+      <div className="mt-auto flex flex-col gap-3 pt-4">
+        <SyncSettings
+          tasks={tasks}
+          projects={projects}
+          onReplaceTasks={onReplaceTasks}
+          onReplaceProjects={onReplaceProjects}
+        />
         <NotificationToggle />
       </div>
     </nav>

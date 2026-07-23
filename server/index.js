@@ -10,6 +10,8 @@ import {
   getDueReminders,
   markSent,
   getSubscription,
+  getSyncData,
+  setSyncData,
 } from './db.js'
 
 const { VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT, PORT = 4000 } = process.env
@@ -50,6 +52,30 @@ app.post('/api/reminders', (req, res) => {
   }
   replaceReminders(endpoint, reminders)
   res.json({ ok: true, count: reminders.length })
+})
+
+function isValidSyncCode(code) {
+  return typeof code === 'string' && /^[A-Za-z0-9]{4,32}$/.test(code)
+}
+
+// Lightweight cross-device sync: a code is just a shared key for one JSON
+// blob, not a real account. Whoever has the code can read/overwrite it —
+// fine for a personal task app, not meant to hold anything sensitive.
+app.get('/api/sync/:code', (req, res) => {
+  if (!isValidSyncCode(req.params.code)) return res.status(400).json({ error: 'invalid code' })
+  const data = getSyncData(req.params.code)
+  if (!data) return res.status(404).json({ error: 'not found' })
+  res.json(data)
+})
+
+app.post('/api/sync/:code', (req, res) => {
+  if (!isValidSyncCode(req.params.code)) return res.status(400).json({ error: 'invalid code' })
+  const { tasks, projects } = req.body
+  if (!Array.isArray(tasks) || !Array.isArray(projects)) {
+    return res.status(400).json({ error: 'tasks[] and projects[] required' })
+  }
+  setSyncData(req.params.code, { tasks, projects })
+  res.json({ ok: true })
 })
 
 // Sends a push immediately, bypassing the schedule — handy for testing and for

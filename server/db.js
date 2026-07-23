@@ -6,11 +6,13 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const DB_PATH = join(__dirname, 'data.json')
 
 function load() {
-  if (!existsSync(DB_PATH)) return { subscriptions: [], reminders: [] }
+  if (!existsSync(DB_PATH)) return { subscriptions: [], reminders: [], sync: {} }
   try {
-    return JSON.parse(readFileSync(DB_PATH, 'utf-8'))
+    const db = JSON.parse(readFileSync(DB_PATH, 'utf-8'))
+    if (!db.sync) db.sync = {}
+    return db
   } catch {
-    return { subscriptions: [], reminders: [] }
+    return { subscriptions: [], reminders: [], sync: {} }
   }
 }
 
@@ -62,4 +64,16 @@ export function getSubscription(endpoint) {
 
 export function getAll() {
   return load()
+}
+
+/** Sync codes are a lightweight pairing mechanism, not real accounts — whole-blob replace, no per-field merge. */
+export function getSyncData(code) {
+  const db = load()
+  return db.sync[code] ?? null
+}
+
+export function setSyncData(code, data) {
+  const db = load()
+  db.sync[code] = { ...data, updatedAt: new Date().toISOString() }
+  save(db)
 }
