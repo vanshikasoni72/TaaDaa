@@ -9,11 +9,12 @@ interface ProjectViewProps {
   projects: Project[]
   onToggle: (id: string) => void
   onDelete: (id: string) => void
+  onSnooze: (id: string, days: 1 | 7) => void
   onAddSubtask: (parentId: string, parsed: ParsedQuickAdd) => void
   onEditTask: (task: Task) => void
 }
 
-export function ProjectView({ project, tasks, projects, onToggle, onDelete, onAddSubtask, onEditTask }: ProjectViewProps) {
+export function ProjectView({ project, tasks, projects, onToggle, onDelete, onSnooze, onAddSubtask, onEditTask }: ProjectViewProps) {
   const projectTasks = tasks
     .filter((t) => t.projectId === project.id && t.parentId === null)
     .sort((a, b) => {
@@ -28,7 +29,7 @@ export function ProjectView({ project, tasks, projects, onToggle, onDelete, onAd
     <div>
       <header className="mb-6 flex items-center gap-2">
         <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: displayColorFor(project) }} />
-        <h1 className="font-serif text-4xl italic text-ink dark:text-ink-dark">{project.name}</h1>
+        <h1 className="font-serif text-4xl italic text-heading">{project.name}</h1>
       </header>
 
       {projectTasks.length === 0 ? (
@@ -45,6 +46,7 @@ export function ProjectView({ project, tasks, projects, onToggle, onDelete, onAd
               subtasks={tasks.filter((t) => t.parentId === task.id)}
               onToggle={onToggle}
               onDelete={onDelete}
+              onSnooze={onSnooze}
               onAddSubtask={onAddSubtask}
               onEdit={onEditTask}
             />

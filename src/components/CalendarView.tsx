@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { Project, Task } from '../types'
 import type { ParsedQuickAdd } from '../lib/parseQuickAdd'
 import { TaskItem } from './TaskItem'
@@ -14,6 +14,8 @@ import {
   toIsoDate,
 } from '../lib/date'
 import { colorForTag } from '../lib/tags'
+import { useDayNotes } from '../lib/useDayNotes'
+import { NoteIcon } from './icons'
 
 type Layout = 'week' | 'month'
 
@@ -22,6 +24,7 @@ interface CalendarViewProps {
   projects: Project[]
   onToggle: (id: string) => void
   onDelete: (id: string) => void
+  onSnooze: (id: string, days: 1 | 7) => void
   onAddSubtask: (parentId: string, parsed: ParsedQuickAdd) => void
   onEditTask: (task: Task) => void
 }
@@ -61,7 +64,7 @@ function DayCell({ day, projects, isSelected, isToday, showWeekday, maxTitles, c
     <button
       type="button"
       onClick={onSelect}
-      className={`flex flex-col items-stretch gap-1 rounded-xl px-1.5 py-2 text-left transition duration-300 hover:ring-1 hover:ring-ink/10 dark:hover:ring-white/10 ${compact ? 'min-h-[76px] sm:min-h-[88px]' : 'min-h-[92px] sm:min-h-[104px]'} ${
+      className={`flex flex-col items-stretch gap-1.5 rounded-xl px-2 py-3 text-left transition duration-300 hover:ring-1 hover:ring-ink/10 dark:hover:ring-border ${compact ? 'min-h-[92px] sm:min-h-[112px]' : 'min-h-[112px] sm:min-h-[132px]'} ${
         isSelected ? 'bg-raspberry/20 ring-2 ring-raspberry/50' : heatClass(day.dayTasks.length)
       } ${day.inCurrentPeriod ? '' : 'opacity-35'}`}
     >
@@ -108,12 +111,18 @@ function DayCell({ day, projects, isSelected, isToday, showWeekday, maxTitles, c
 
 const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
-export function CalendarView({ tasks, projects, onToggle, onDelete, onAddSubtask, onEditTask }: CalendarViewProps) {
+export function CalendarView({ tasks, projects, onToggle, onDelete, onSnooze, onAddSubtask, onEditTask }: CalendarViewProps) {
   const today = todayIso()
   const [layout, setLayout] = useState<Layout>('week')
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()))
   const [monthAnchor, setMonthAnchor] = useState(() => startOfMonth(new Date()))
   const [selected, setSelected] = useState(today)
+  const [noteOpen, setNoteOpen] = useState(false)
+  const { notes, setNoteForDay } = useDayNotes()
+
+  useEffect(() => {
+    setNoteOpen(false)
+  }, [selected])
 
   const dates = useMemo(() => {
     return layout === 'week'
@@ -235,7 +244,7 @@ export function CalendarView({ tasks, projects, onToggle, onDelete, onAddSubtask
         </div>
       )}
 
-      <div className="grid grid-cols-7 gap-1 sm:gap-2">
+      <div className="grid grid-cols-7 gap-2 sm:gap-3">
         {days.map((day) => (
           <DayCell
             key={day.iso}
@@ -252,9 +261,33 @@ export function CalendarView({ tasks, projects, onToggle, onDelete, onAddSubtask
       </div>
 
       <div className="mt-6">
-        <h2 className="mb-1 px-1 font-serif text-sm italic text-ink/50 dark:text-ink-dark/50">
-          {selectedLabel}
-        </h2>
+        <div className="mb-1 flex items-center gap-2 px-1">
+          <h2 className="font-serif text-sm italic text-ink/50 dark:text-ink-dark/50">{selectedLabel}</h2>
+          <button
+            type="button"
+            onClick={() => setNoteOpen((v) => !v)}
+            aria-label={notes[selectedDay.iso] ? 'Edit note for this day' : 'Add a note for this day'}
+            className={`transition-colors duration-150 ${
+              notes[selectedDay.iso]
+                ? 'text-rose'
+                : 'text-ink/25 hover:text-ink/50 dark:text-ink-dark/25 dark:hover:text-ink-dark/50'
+            }`}
+          >
+            <NoteIcon />
+          </button>
+        </div>
+
+        {noteOpen && (
+          <textarea
+            autoFocus
+            value={notes[selectedDay.iso] ?? ''}
+            onChange={(e) => setNoteForDay(selectedDay.iso, e.target.value)}
+            placeholder="a scrap of a note for this day…"
+            rows={3}
+            className="mb-3 w-full rounded-xl border border-ink/10 bg-white/60 px-3 py-2 text-sm text-ink outline-none focus:border-raspberry/40 dark:border-border dark:bg-white/5 dark:text-ink-dark"
+          />
+        )}
+
         {selectedDay.dayTasks.length === 0 ? (
           <p className="px-1 py-8 text-center text-sm italic text-ink/40 dark:text-ink-dark/40">
             This one's quiet. For now.
@@ -269,6 +302,7 @@ export function CalendarView({ tasks, projects, onToggle, onDelete, onAddSubtask
                 subtasks={tasks.filter((t) => t.parentId === task.id)}
                 onToggle={onToggle}
                 onDelete={onDelete}
+                onSnooze={onSnooze}
                 onAddSubtask={onAddSubtask}
                 onEdit={onEditTask}
               />

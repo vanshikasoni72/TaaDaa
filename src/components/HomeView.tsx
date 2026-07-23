@@ -9,6 +9,7 @@ interface HomeViewProps {
   projects: Project[]
   onToggle: (id: string) => void
   onDelete: (id: string) => void
+  onSnooze: (id: string, days: 1 | 7) => void
   onAddSubtask: (parentId: string, parsed: ParsedQuickAdd) => void
   onEditTask: (task: Task) => void
 }
@@ -21,11 +22,12 @@ interface GroupProps {
   projects: Project[]
   onToggle: (id: string) => void
   onDelete: (id: string) => void
+  onSnooze: (id: string, days: 1 | 7) => void
   onAddSubtask: (parentId: string, parsed: ParsedQuickAdd) => void
   onEditTask: (task: Task) => void
 }
 
-function Group({ title, color, tasks, allTasks, projects, onToggle, onDelete, onAddSubtask, onEditTask }: GroupProps) {
+function Group({ title, color, tasks, allTasks, projects, onToggle, onDelete, onSnooze, onAddSubtask, onEditTask }: GroupProps) {
   if (tasks.length === 0) return null
   return (
     <div>
@@ -43,6 +45,7 @@ function Group({ title, color, tasks, allTasks, projects, onToggle, onDelete, on
             subtasks={allTasks.filter((t) => t.parentId === task.id)}
             onToggle={onToggle}
             onDelete={onDelete}
+            onSnooze={onSnooze}
             onAddSubtask={onAddSubtask}
             onEdit={onEditTask}
           />
@@ -55,20 +58,22 @@ function Group({ title, color, tasks, allTasks, projects, onToggle, onDelete, on
 function Header() {
   return (
     <header className="mb-6">
-      <h1 className="font-serif text-4xl italic text-ink dark:text-ink-dark">Home</h1>
+      <h1 className="font-serif text-4xl italic text-heading">Home</h1>
       <p className="mt-1 text-sm text-ink/50 dark:text-ink-dark/50">next 7 days, by project</p>
     </header>
   )
 }
 
-export function HomeView({ tasks, projects, onToggle, onDelete, onAddSubtask, onEditTask }: HomeViewProps) {
+export function HomeView({ tasks, projects, onToggle, onDelete, onSnooze, onAddSubtask, onEditTask }: HomeViewProps) {
   const today = todayIso()
   const rangeEnd = toIsoDate(addDays(new Date(), 6))
   const topLevel = tasks.filter((t) => t.parentId === null)
 
+  // "yesterday's problem" now keys off the due date (the actual deadline) —
+  // the work-on date still drives normal calendar/grouping placement below.
   const overdue = topLevel
-    .filter((t) => !t.done && t.date && t.date < today)
-    .sort((a, b) => a.date!.localeCompare(b.date!))
+    .filter((t) => !t.done && t.dueDate && t.dueDate < today)
+    .sort((a, b) => a.dueDate!.localeCompare(b.dueDate!))
 
   const inRange = topLevel.filter((t) => t.date && t.date >= today && t.date <= rangeEnd)
 
@@ -112,7 +117,7 @@ export function HomeView({ tasks, projects, onToggle, onDelete, onAddSubtask, on
     )
   }
 
-  const groupProps = { allTasks: tasks, projects, onToggle, onDelete, onAddSubtask, onEditTask }
+  const groupProps = { allTasks: tasks, projects, onToggle, onDelete, onSnooze, onAddSubtask, onEditTask }
 
   return (
     <div>

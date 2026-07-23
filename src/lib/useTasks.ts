@@ -17,6 +17,7 @@ interface AddTaskInput {
   title: string
   date: string | null
   time?: string | null
+  dueDate?: string | null
   projectId?: string | null
   priority?: Priority | null
   tags: string[]
@@ -39,6 +40,7 @@ export function useTasks() {
       title: input.title,
       date: input.date,
       time: input.time ?? null,
+      dueDate: input.dueDate ?? null,
       projectId: input.projectId ?? null,
       priority: input.priority ?? null,
       tags: input.tags,

@@ -27,6 +27,9 @@ function toolbarBtnClass(active: boolean) {
   }`
 }
 
+const fieldClass =
+  'w-full rounded-lg border border-ink/10 bg-white/60 px-2 py-1.5 text-sm text-ink outline-none focus:border-raspberry/40 dark:border-border dark:bg-transparent dark:text-ink-dark'
+
 export const QuickAdd = forwardRef<HTMLInputElement, QuickAddProps>(function QuickAdd(
   { projects, onAdd },
   ref,
@@ -34,6 +37,7 @@ export const QuickAdd = forwardRef<HTMLInputElement, QuickAddProps>(function Qui
   const [value, setValue] = useState('')
   const [popover, setPopover] = useState<Popover>(null)
   const [manualDate, setManualDate] = useState<string | null>(null)
+  const [manualDueDate, setManualDueDate] = useState<string | null>(null)
   const [manualTime, setManualTime] = useState<string | null>(null)
   const [manualProjectId, setManualProjectId] = useState<string | null>(null)
   const [manualPriority, setManualPriority] = useState<Priority | null>(null)
@@ -57,6 +61,7 @@ export const QuickAdd = forwardRef<HTMLInputElement, QuickAddProps>(function Qui
 
   function resetToolbar() {
     setManualDate(null)
+    setManualDueDate(null)
     setManualTime(null)
     setManualProjectId(null)
     setManualPriority(null)
@@ -71,6 +76,7 @@ export const QuickAdd = forwardRef<HTMLInputElement, QuickAddProps>(function Qui
     onAdd({
       ...preview,
       date: manualDate ?? preview.date,
+      dueDate: manualDueDate,
       time: manualTime,
       projectId: manualProjectId,
       priority: manualPriority,
@@ -91,9 +97,9 @@ export const QuickAdd = forwardRef<HTMLInputElement, QuickAddProps>(function Qui
         type="text"
         value={value}
         onChange={(e) => setValue(e.target.value)}
-        placeholder="dinner with sara tomorrow @Boyfie #fun"
+        placeholder="Add a task…"
         autoComplete="off"
-        className="w-full rounded-2xl border border-ink/10 bg-white/60 px-4 py-3.5 text-base text-ink placeholder:text-ink/35 shadow-sm outline-none transition-shadow duration-150 focus:border-raspberry/40 focus:ring-2 focus:ring-raspberry/25 dark:border-white/10 dark:bg-white/5 dark:text-ink-dark dark:placeholder:text-ink-dark/35"
+        className="w-full rounded-2xl border border-quickadd-border bg-quickadd px-4 py-3.5 text-base text-ink placeholder:text-ink/35 shadow-sm outline-none transition-shadow duration-150 focus:border-raspberry/40 focus:ring-2 focus:ring-raspberry/25 dark:text-ink-dark dark:placeholder:text-ink-dark/35"
       />
 
       {preview && (preview.date || preview.projectPath || preview.tags.length > 0 || preview.recurrence) && (
@@ -101,6 +107,11 @@ export const QuickAdd = forwardRef<HTMLInputElement, QuickAddProps>(function Qui
           {preview.date && !manualDate && (
             <span className="rounded-full bg-ink/5 px-2 py-0.5 text-xs text-ink/60 dark:bg-white/10 dark:text-ink-dark/60">
               {preview.date}
+            </span>
+          )}
+          {manualDueDate && (
+            <span className="rounded-full bg-magenta/15 px-2 py-0.5 text-xs font-medium text-magenta">
+              due {manualDueDate}
             </span>
           )}
           {preview.recurrence && (
@@ -132,7 +143,12 @@ export const QuickAdd = forwardRef<HTMLInputElement, QuickAddProps>(function Qui
         <button type="button" onClick={() => togglePopover('project')} className={toolbarBtnClass(hasProject)} aria-label="Project">
           <FolderIcon />
         </button>
-        <button type="button" onClick={() => togglePopover('date')} className={toolbarBtnClass(Boolean(effectiveDate))} aria-label="Date">
+        <button
+          type="button"
+          onClick={() => togglePopover('date')}
+          className={toolbarBtnClass(Boolean(effectiveDate) || Boolean(manualDueDate))}
+          aria-label="Dates"
+        >
           <CalendarIcon />
         </button>
         <button type="button" onClick={() => togglePopover('time')} className={toolbarBtnClass(Boolean(manualTime))} aria-label="Time">
@@ -157,12 +173,12 @@ export const QuickAdd = forwardRef<HTMLInputElement, QuickAddProps>(function Qui
       </div>
 
       {popover && (
-        <div className="mt-2 rounded-xl border border-ink/10 bg-white/60 p-3 dark:border-white/10 dark:bg-white/5">
+        <div className="mt-2 rounded-xl border border-ink/10 bg-white/60 p-3 dark:border-border dark:bg-white/5">
           {popover === 'project' && (
             <select
               value={manualProjectId ?? '__none__'}
               onChange={(e) => setManualProjectId(e.target.value === '__none__' ? null : e.target.value)}
-              className="w-full rounded-lg border border-ink/10 bg-white/60 px-2 py-1.5 text-sm text-ink outline-none focus:border-raspberry/40 dark:border-white/10 dark:bg-white/5 dark:text-ink-dark"
+              className={fieldClass}
             >
               <option value="__none__">use @project typed above, or none</option>
               {projects.map((p) => (
@@ -174,12 +190,30 @@ export const QuickAdd = forwardRef<HTMLInputElement, QuickAddProps>(function Qui
           )}
 
           {popover === 'date' && (
-            <input
-              type="date"
-              value={manualDate ?? ''}
-              onChange={(e) => setManualDate(e.target.value || null)}
-              className="w-full rounded-lg border border-ink/10 bg-white/60 px-2 py-1.5 text-sm text-ink outline-none focus:border-raspberry/40 dark:border-white/10 dark:bg-white/5 dark:text-ink-dark"
-            />
+            <div className="flex flex-col gap-2">
+              <label className="flex flex-col gap-1">
+                <span className="text-[10px] uppercase tracking-wide text-ink/40 dark:text-ink-dark/40">
+                  Work on
+                </span>
+                <input
+                  type="date"
+                  value={manualDate ?? ''}
+                  onChange={(e) => setManualDate(e.target.value || null)}
+                  className={fieldClass}
+                />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-[10px] uppercase tracking-wide text-ink/40 dark:text-ink-dark/40">
+                  Due date
+                </span>
+                <input
+                  type="date"
+                  value={manualDueDate ?? ''}
+                  onChange={(e) => setManualDueDate(e.target.value || null)}
+                  className={fieldClass}
+                />
+              </label>
+            </div>
           )}
 
           {popover === 'time' && (
@@ -187,7 +221,7 @@ export const QuickAdd = forwardRef<HTMLInputElement, QuickAddProps>(function Qui
               type="time"
               value={manualTime ?? ''}
               onChange={(e) => setManualTime(e.target.value || null)}
-              className="w-full rounded-lg border border-ink/10 bg-white/60 px-2 py-1.5 text-sm text-ink outline-none focus:border-raspberry/40 dark:border-white/10 dark:bg-white/5 dark:text-ink-dark"
+              className={fieldClass}
             />
           )}
 
@@ -201,7 +235,7 @@ export const QuickAdd = forwardRef<HTMLInputElement, QuickAddProps>(function Qui
                   className={`flex-1 rounded-lg border px-2 py-1.5 text-sm transition-colors duration-150 ${
                     manualPriority === p
                       ? 'border-raspberry bg-raspberry/10 text-raspberry'
-                      : 'border-ink/10 text-ink/50 hover:border-ink/20 dark:border-white/10 dark:text-ink-dark/50'
+                      : 'border-ink/10 text-ink/50 hover:border-ink/20 dark:border-border dark:text-ink-dark/50'
                   }`}
                 >
                   {p === null ? 'none' : `⚑ ${p}`}
@@ -222,7 +256,7 @@ export const QuickAdd = forwardRef<HTMLInputElement, QuickAddProps>(function Qui
                     className={`rounded-full border px-3 py-1 text-xs transition-colors duration-150 ${
                       active
                         ? 'border-raspberry bg-raspberry/10 text-raspberry'
-                        : 'border-ink/10 text-ink/50 hover:border-ink/20 dark:border-white/10 dark:text-ink-dark/50'
+                        : 'border-ink/10 text-ink/50 hover:border-ink/20 dark:border-border dark:text-ink-dark/50'
                     }`}
                   >
                     {preset.label}
@@ -238,7 +272,7 @@ export const QuickAdd = forwardRef<HTMLInputElement, QuickAddProps>(function Qui
               value={manualNote ?? ''}
               onChange={(e) => setManualNote(e.target.value || null)}
               placeholder="anything worth attaching"
-              className="w-full rounded-lg border border-ink/10 bg-white/60 px-2 py-1.5 text-sm text-ink outline-none focus:border-raspberry/40 dark:border-white/10 dark:bg-white/5 dark:text-ink-dark"
+              className={fieldClass}
             />
           )}
         </div>

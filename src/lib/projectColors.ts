@@ -1,6 +1,6 @@
 import type { Project } from '../types'
 
-const ROTATION = ['#ad1357', '#cc698f', '#b44c75', '#de2776', '#c4707a']
+const ROTATION = ['#ad1357', '#cc698f', '#b44c75', '#de2776', '#c4707a', '#e39bc4', '#4fbdae']
 
 export function colorForNewProject(name: string, existingTopLevelCount: number): string {
   if (name.trim().toLowerCase() === 'boyfie') return '#c4707a' // dusty rose, per spec

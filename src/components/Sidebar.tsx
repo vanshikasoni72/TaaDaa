@@ -4,6 +4,7 @@ import { displayColorFor } from '../lib/projectColors'
 import type { ViewState } from '../lib/viewState'
 import { NotificationToggle } from './NotificationToggle'
 import { SyncSettings } from './SyncSettings'
+import { exportData } from '../lib/exportData'
 
 interface SidebarProps {
   projects: Project[]
@@ -15,6 +16,7 @@ interface SidebarProps {
 }
 
 const PINNED: { label: string; view: ViewState }[] = [
+  { label: 'Inbox', view: { kind: 'inbox' } },
   { label: 'Home', view: { kind: 'home' } },
   { label: 'Today', view: { kind: 'today' } },
   { label: 'Upcoming', view: { kind: 'upcoming' } },
@@ -35,6 +37,8 @@ export function Sidebar({ projects, tasks, view, onNavigate, onReplaceTasks, onR
 
   return (
     <nav className="flex h-full flex-col gap-6 overflow-y-auto px-4 py-6">
+      <div className="px-3 font-serif text-lg italic text-wordmark">TaaDaa</div>
+
       <div className="flex flex-col gap-0.5">
         {PINNED.map(({ label, view: linkView }) => (
           <button
@@ -142,6 +146,13 @@ export function Sidebar({ projects, tasks, view, onNavigate, onReplaceTasks, onR
           onReplaceProjects={onReplaceProjects}
         />
         <NotificationToggle />
+        <button
+          type="button"
+          onClick={() => exportData(tasks, projects)}
+          className="self-start text-xs text-ink/50 transition-colors duration-150 hover:text-raspberry dark:text-ink-dark/50"
+        >
+          export data
+        </button>
       </div>
     </nav>
   )

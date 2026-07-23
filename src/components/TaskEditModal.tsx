@@ -23,6 +23,9 @@ function fieldLabel(text: string) {
   )
 }
 
+const fieldClass =
+  'w-full rounded-lg border border-ink/10 bg-white/60 px-2 py-1.5 text-sm text-ink outline-none focus:border-raspberry/40 dark:border-border dark:bg-transparent dark:text-ink-dark'
+
 export function TaskEditModal({ task, projects, onClose, onChange, onDelete, onResolveProject }: TaskEditModalProps) {
   const [newProjectName, setNewProjectName] = useState('')
   const [addingProject, setAddingProject] = useState(false)
@@ -82,7 +85,7 @@ export function TaskEditModal({ task, projects, onClose, onChange, onDelete, onR
             type="text"
             value={task.title}
             onChange={(e) => onChange(task.id, { title: e.target.value })}
-            className="flex-1 bg-transparent font-serif text-2xl italic text-ink outline-none dark:text-ink-dark"
+            className="flex-1 bg-transparent font-serif text-2xl italic text-heading outline-none"
           />
           <button
             type="button"
@@ -97,24 +100,34 @@ export function TaskEditModal({ task, projects, onClose, onChange, onDelete, onR
         <div className="flex flex-col gap-4">
           <div className="grid grid-cols-2 gap-3">
             <label>
-              {fieldLabel('Date')}
+              {fieldLabel('Work on')}
               <input
                 type="date"
                 value={task.date ?? ''}
                 onChange={(e) => onChange(task.id, { date: e.target.value || null })}
-                className="w-full rounded-lg border border-ink/10 bg-white/60 px-2 py-1.5 text-sm text-ink outline-none focus:border-raspberry/40 dark:border-white/10 dark:bg-white/5 dark:text-ink-dark"
+                className={fieldClass}
               />
             </label>
             <label>
-              {fieldLabel('Time')}
+              <span className="mb-1 block text-xs uppercase tracking-wide text-magenta">Due date</span>
               <input
-                type="time"
-                value={task.time ?? ''}
-                onChange={(e) => onChange(task.id, { time: e.target.value || null })}
-                className="w-full rounded-lg border border-ink/10 bg-white/60 px-2 py-1.5 text-sm text-ink outline-none focus:border-raspberry/40 dark:border-white/10 dark:bg-white/5 dark:text-ink-dark"
+                type="date"
+                value={task.dueDate ?? ''}
+                onChange={(e) => onChange(task.id, { dueDate: e.target.value || null })}
+                className={fieldClass}
               />
             </label>
           </div>
+
+          <label>
+            {fieldLabel('Time')}
+            <input
+              type="time"
+              value={task.time ?? ''}
+              onChange={(e) => onChange(task.id, { time: e.target.value || null })}
+              className={fieldClass}
+            />
+          </label>
 
           <div>
             {fieldLabel('Project')}
@@ -126,18 +139,14 @@ export function TaskEditModal({ task, projects, onClose, onChange, onDelete, onR
                   value={newProjectName}
                   onChange={(e) => setNewProjectName(e.target.value)}
                   placeholder="Home or Home/Groceries"
-                  className="flex-1 rounded-lg border border-ink/10 bg-white/60 px-2 py-1.5 text-sm text-ink outline-none focus:border-raspberry/40 dark:border-white/10 dark:bg-white/5 dark:text-ink-dark"
+                  className={fieldClass}
                 />
                 <button type="submit" className="text-sm font-medium text-raspberry">
                   add
                 </button>
               </form>
             ) : (
-              <select
-                value={task.projectId ?? '__none__'}
-                onChange={(e) => handleProjectSelect(e.target.value)}
-                className="w-full rounded-lg border border-ink/10 bg-white/60 px-2 py-1.5 text-sm text-ink outline-none focus:border-raspberry/40 dark:border-white/10 dark:bg-white/5 dark:text-ink-dark"
-              >
+              <select value={task.projectId ?? '__none__'} onChange={(e) => handleProjectSelect(e.target.value)} className={fieldClass}>
                 <option value="__none__">no project</option>
                 {projects.map((p) => (
                   <option key={p.id} value={p.id}>
@@ -160,7 +169,7 @@ export function TaskEditModal({ task, projects, onClose, onChange, onDelete, onR
                   className={`flex-1 rounded-lg border px-2 py-1.5 text-sm transition-colors duration-150 ${
                     task.priority === p
                       ? 'border-raspberry bg-raspberry/10 text-raspberry'
-                      : 'border-ink/10 text-ink/50 hover:border-ink/20 dark:border-white/10 dark:text-ink-dark/50'
+                      : 'border-ink/10 text-ink/50 hover:border-ink/20 dark:border-border dark:text-ink-dark/50'
                   }`}
                 >
                   {p === null ? 'none' : `⚑ ${p}`}
@@ -171,13 +180,7 @@ export function TaskEditModal({ task, projects, onClose, onChange, onDelete, onR
 
           <div>
             {fieldLabel('Tags')}
-            <input
-              type="text"
-              value={tagsText}
-              onChange={(e) => commitTags(e.target.value)}
-              placeholder="#fun #social"
-              className="w-full rounded-lg border border-ink/10 bg-white/60 px-2 py-1.5 text-sm text-ink outline-none focus:border-raspberry/40 dark:border-white/10 dark:bg-white/5 dark:text-ink-dark"
-            />
+            <input type="text" value={tagsText} onChange={(e) => commitTags(e.target.value)} placeholder="#fun #social" className={fieldClass} />
           </div>
 
           <div>
@@ -193,7 +196,7 @@ export function TaskEditModal({ task, projects, onClose, onChange, onDelete, onR
                     className={`rounded-full border px-3 py-1 text-xs transition-colors duration-150 ${
                       active
                         ? 'border-raspberry bg-raspberry/10 text-raspberry'
-                        : 'border-ink/10 text-ink/50 hover:border-ink/20 dark:border-white/10 dark:text-ink-dark/50'
+                        : 'border-ink/10 text-ink/50 hover:border-ink/20 dark:border-border dark:text-ink-dark/50'
                     }`}
                   >
                     {preset.label}
@@ -210,7 +213,7 @@ export function TaskEditModal({ task, projects, onClose, onChange, onDelete, onR
               value={task.note ?? ''}
               onChange={(e) => onChange(task.id, { note: e.target.value || null })}
               placeholder="anything worth attaching"
-              className="w-full rounded-lg border border-ink/10 bg-white/60 px-2 py-1.5 text-sm text-ink outline-none focus:border-raspberry/40 dark:border-white/10 dark:bg-white/5 dark:text-ink-dark"
+              className={fieldClass}
             />
           </div>
 

@@ -55,6 +55,15 @@ export function FlagIcon({ size = 16, className }: IconProps) {
   )
 }
 
+export function NoteIcon({ size = 14, className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} className={className} {...shared}>
+      <path d="M5 4h11l3 3v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Z" />
+      <path d="M8 10h8M8 14h5" />
+    </svg>
+  )
+}
+
 export function FolderIcon({ size = 16, className }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" width={size} height={size} className={className} {...shared}>

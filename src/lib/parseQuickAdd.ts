@@ -15,6 +15,8 @@ export interface ParsedQuickAdd {
 /** Everything QuickAdd's toolbar can layer on top of the parsed text. */
 export interface QuickAddSubmission extends ParsedQuickAdd {
   time: string | null
+  /** the actual deadline, purely manual — text parsing never sets this, only "date" (work-on) */
+  dueDate: string | null
   /** set via the project dropdown; takes precedence over `projectPath` when resolving */
   projectId: string | null
   priority: Priority | null

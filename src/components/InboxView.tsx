@@ -1,9 +1,8 @@
 import type { Project, Task } from '../types'
 import type { ParsedQuickAdd } from '../lib/parseQuickAdd'
 import { TaskItem } from './TaskItem'
-import { todayIso } from '../lib/date'
 
-interface UpcomingViewProps {
+interface InboxViewProps {
   tasks: Task[]
   projects: Project[]
   onToggle: (id: string) => void
@@ -13,27 +12,25 @@ interface UpcomingViewProps {
   onEditTask: (task: Task) => void
 }
 
-export function UpcomingView({ tasks, projects, onToggle, onDelete, onSnooze, onAddSubtask, onEditTask }: UpcomingViewProps) {
-  const today = todayIso()
-  const topLevel = tasks.filter((t) => t.parentId === null)
-  const upcoming = topLevel
-    .filter((t) => t.date && t.date > today)
-    .sort((a, b) => a.date!.localeCompare(b.date!))
+export function InboxView({ tasks, projects, onToggle, onDelete, onSnooze, onAddSubtask, onEditTask }: InboxViewProps) {
+  const inbox = tasks
+    .filter((t) => t.parentId === null && t.projectId === null)
+    .sort((a, b) => b.createdAt - a.createdAt)
 
   return (
     <div>
       <header className="mb-6">
-        <h1 className="font-serif text-4xl italic text-heading">Upcoming</h1>
-        <p className="mt-1 text-sm text-ink/50 dark:text-ink-dark/50">everything after today</p>
+        <h1 className="font-serif text-4xl italic text-heading">Inbox</h1>
+        <p className="mt-1 text-sm text-ink/50 dark:text-ink-dark/50">not filed anywhere yet</p>
       </header>
 
-      {upcoming.length === 0 ? (
+      {inbox.length === 0 ? (
         <p className="px-3 py-12 text-center font-serif italic text-ink/40 dark:text-ink-dark/40">
-          Nothing on the horizon. For now.
+          Blank canvas. Or you're procrastinating. Unclear.
         </p>
       ) : (
         <div className="flex flex-col">
-          {upcoming.map((task) => (
+          {inbox.map((task) => (
             <TaskItem
               key={task.id}
               task={task}

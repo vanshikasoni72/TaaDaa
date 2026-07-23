@@ -8,6 +8,7 @@ interface TodayViewProps {
   projects: Project[]
   onToggle: (id: string) => void
   onDelete: (id: string) => void
+  onSnooze: (id: string, days: 1 | 7) => void
   onAddSubtask: (parentId: string, parsed: ParsedQuickAdd) => void
   onEditTask: (task: Task) => void
 }
@@ -19,11 +20,12 @@ interface SectionProps {
   projects: Project[]
   onToggle: (id: string) => void
   onDelete: (id: string) => void
+  onSnooze: (id: string, days: 1 | 7) => void
   onAddSubtask: (parentId: string, parsed: ParsedQuickAdd) => void
   onEditTask: (task: Task) => void
 }
 
-function Section({ title, tasks, allTasks, projects, onToggle, onDelete, onAddSubtask, onEditTask }: SectionProps) {
+function Section({ title, tasks, allTasks, projects, onToggle, onDelete, onSnooze, onAddSubtask, onEditTask }: SectionProps) {
   if (tasks.length === 0) return null
   return (
     <div>
@@ -39,6 +41,7 @@ function Section({ title, tasks, allTasks, projects, onToggle, onDelete, onAddSu
             subtasks={allTasks.filter((t) => t.parentId === task.id)}
             onToggle={onToggle}
             onDelete={onDelete}
+            onSnooze={onSnooze}
             onAddSubtask={onAddSubtask}
             onEdit={onEditTask}
           />
@@ -56,17 +59,19 @@ function Header() {
   })
   return (
     <header className="mb-6">
-      <h1 className="font-serif text-4xl italic text-ink dark:text-ink-dark">Today</h1>
+      <h1 className="font-serif text-4xl italic text-heading">Today</h1>
       <p className="mt-1 text-sm text-ink/50 dark:text-ink-dark/50">{todayLabel}</p>
     </header>
   )
 }
 
-export function TodayView({ tasks, projects, onToggle, onDelete, onAddSubtask, onEditTask }: TodayViewProps) {
+export function TodayView({ tasks, projects, onToggle, onDelete, onSnooze, onAddSubtask, onEditTask }: TodayViewProps) {
   const today = todayIso()
   const topLevel = tasks.filter((t) => t.parentId === null)
 
-  const overdue = topLevel.filter((t) => !t.done && t.date && t.date < today)
+  // "yesterday's problem" keys off the due date (the actual deadline), not
+  // the work-on date — see the Home view for the same convention.
+  const overdue = topLevel.filter((t) => !t.done && t.dueDate && t.dueDate < today)
   const dueToday = topLevel.filter((t) => t.date === today)
   const upcoming = topLevel
     .filter((t) => t.date && t.date > today)
@@ -96,7 +101,7 @@ export function TodayView({ tasks, projects, onToggle, onDelete, onAddSubtask, o
     )
   }
 
-  const sectionProps = { allTasks: tasks, projects, onToggle, onDelete, onAddSubtask, onEditTask }
+  const sectionProps = { allTasks: tasks, projects, onToggle, onDelete, onSnooze, onAddSubtask, onEditTask }
 
   return (
     <div>

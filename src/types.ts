@@ -25,10 +25,12 @@ export interface Task {
   id: string
   title: string
   done: boolean
-  /** ISO date string YYYY-MM-DD, or null if unscheduled */
+  /** "Work on" date — ISO YYYY-MM-DD, or null if unscheduled. Drives calendar placement. */
   date: string | null
   /** "HH:MM" 24h, or null if only a date (no specific time) was set */
   time: string | null
+  /** Actual deadline — ISO YYYY-MM-DD, or null if none. The harder constraint: drives "yesterday's problem" (overdue) instead of `date`. */
+  dueDate: string | null
   projectId: string | null
   priority: Priority | null
   tags: string[]

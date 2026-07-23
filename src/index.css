@@ -10,12 +10,11 @@
    solely by prefers-color-scheme. */
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* "Raspberry Moon" palette. Exact hex values from the spec, non-negotiable. */
 @theme {
   --color-cream: #fad6d5;
-  --color-cream-dark: #241019;
+  --color-cream-dark: #141416;
   --color-ink: #2b2a28;
-  --color-ink-dark: #f2ede6;
+  --color-ink-dark: #e8e8ed;
   --color-raspberry: #ad1357;
   --color-rose: #cc698f;
   --color-softpink: #ffd4e4;
@@ -24,20 +23,41 @@
   --color-magenta: #de2776;
   --color-blush: #ffd4d4;
 
+  /* Dark-mode-only surface roles (light mode has no separate sidebar/border/
+     badge concept yet, so these default to values that are inert/harmless
+     in light mode, and get their real values from the .dark block below). */
+  --color-sidebar: #fad6d5;
+  --color-border: rgba(43, 42, 40, 0.1);
+  --color-heading: #2b2a28;
+  --color-wordmark: #ad1357;
+  --color-badge-bg: transparent;
+  --color-badge-text: #2b2a28;
+  --color-quickadd: rgba(255, 255, 255, 0.6);
+  --color-quickadd-border: rgba(43, 42, 40, 0.1);
+
   --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
   --font-serif: 'Fraunces', ui-serif, Georgia, serif;
 }
 
-/* Same accents in dark mode, slightly desaturated/lightened so they don't
-   glow harshly against the plum-charcoal base. */
+/* Full dark-mode recolor — light mode keeps the Raspberry Moon values above
+   untouched; this is a dark-mode-specific palette, not a whole-app one. */
 .dark {
-  --color-raspberry: #c04b7c;
+  --color-raspberry: #d63c7a;
   --color-rose: #d68aa8;
   --color-softpink: #3a1f2a;
   --color-berry: #c17a94;
   --color-dustyrose: #cf8b9a;
   --color-magenta: #e35f96;
   --color-blush: #35202a;
+
+  --color-sidebar: #1c1c1f;
+  --color-border: #2a2a2e;
+  --color-heading: #f5f5f7;
+  --color-wordmark: #e8639f;
+  --color-badge-bg: #3a2130;
+  --color-badge-text: #e8a0c0;
+  --color-quickadd: #232326;
+  --color-quickadd-border: #333338;
 }
 
 html {
@@ -64,7 +84,7 @@ body {
 }
 
 .dark .calendar-texture {
-  background-image: radial-gradient(circle, rgba(242, 237, 230, 0.06) 1px, transparent 1px);
+  background-image: radial-gradient(circle, rgba(232, 232, 237, 0.05) 1px, transparent 1px);
 }
 
 /* Motion tiers used throughout: 150ms hover/focus feedback, 300ms discrete
