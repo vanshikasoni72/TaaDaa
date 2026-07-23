@@ -1,7 +1,9 @@
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import type { Project, Task } from '../types'
 import type { ParsedQuickAdd } from '../lib/parseQuickAdd'
 import { TaskItem } from './TaskItem'
 import { todayIso } from '../lib/date'
+import { sortForDisplay } from '../lib/sortTasks'
 
 interface TodayViewProps {
   tasks: Task[]
@@ -27,25 +29,28 @@ interface SectionProps {
 
 function Section({ title, tasks, allTasks, projects, onToggle, onDelete, onSnooze, onAddSubtask, onEditTask }: SectionProps) {
   if (tasks.length === 0) return null
+  const displayTasks = sortForDisplay(tasks)
   return (
     <div>
       <h2 className="mb-1 px-3 font-serif text-sm italic text-ink/50 dark:text-ink-dark/50">
         {title}
       </h2>
       <div className="flex flex-col">
-        {tasks.map((task) => (
-          <TaskItem
-            key={task.id}
-            task={task}
-            projects={projects}
-            subtasks={allTasks.filter((t) => t.parentId === task.id)}
-            onToggle={onToggle}
-            onDelete={onDelete}
-            onSnooze={onSnooze}
-            onAddSubtask={onAddSubtask}
-            onEdit={onEditTask}
-          />
-        ))}
+        <SortableContext items={displayTasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+          {displayTasks.map((task) => (
+            <TaskItem
+              key={task.id}
+              task={task}
+              projects={projects}
+              subtasks={allTasks.filter((t) => t.parentId === task.id)}
+              onToggle={onToggle}
+              onDelete={onDelete}
+              onSnooze={onSnooze}
+              onAddSubtask={onAddSubtask}
+              onEdit={onEditTask}
+            />
+          ))}
+        </SortableContext>
       </div>
     </div>
   )

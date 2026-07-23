@@ -7,6 +7,7 @@ import type { Priority, Project, ReminderRule } from '../types'
 
 interface QuickAddProps {
   projects: Project[]
+  existingTags?: string[]
   onAdd: (input: QuickAddSubmission) => void
 }
 
@@ -31,11 +32,13 @@ const fieldClass =
   'w-full rounded-lg border border-ink/10 bg-white/60 px-2 py-1.5 text-sm text-ink outline-none focus:border-raspberry/40 dark:border-border dark:bg-transparent dark:text-ink-dark'
 
 export const QuickAdd = forwardRef<HTMLInputElement, QuickAddProps>(function QuickAdd(
-  { projects, onAdd },
+  { projects, existingTags = [], onAdd },
   ref,
 ) {
   const [value, setValue] = useState('')
   const [popover, setPopover] = useState<Popover>(null)
+  const [tagActiveIndex, setTagActiveIndex] = useState(0)
+  const [dismissedTagQuery, setDismissedTagQuery] = useState<string | null>(null)
   const [manualDate, setManualDate] = useState<string | null>(null)
   const [manualDueDate, setManualDueDate] = useState<string | null>(null)
   const [manualTime, setManualTime] = useState<string | null>(null)
@@ -45,6 +48,43 @@ export const QuickAdd = forwardRef<HTMLInputElement, QuickAddProps>(function Qui
   const [manualNote, setManualNote] = useState<string | null>(null)
 
   const preview = useMemo(() => (value.trim() ? parseQuickAdd(value) : null), [value])
+
+  // Tag autocomplete: a trailing "#partial" at the end of the input opens a
+  // dropdown of already-used tags (plus the built-in defaults) that match as
+  // a prefix. Deliberately end-of-string only, matching how the rest of
+  // quick-add's parsing already isn't caret-position-aware.
+  const tagMatch = /#([a-zA-Z0-9_-]*)$/.exec(value)
+  const tagQuery = tagMatch ? tagMatch[1].toLowerCase() : null
+  const tagSuggestions =
+    tagQuery !== null
+      ? existingTags.filter((t) => t.toLowerCase().startsWith(tagQuery) && t.toLowerCase() !== tagQuery).slice(0, 6)
+      : []
+  const showTagDropdown = tagQuery !== null && tagQuery !== dismissedTagQuery && tagSuggestions.length > 0
+  const clampedTagIndex = Math.min(tagActiveIndex, Math.max(tagSuggestions.length - 1, 0))
+
+  function selectTagSuggestion(tag: string) {
+    if (!tagMatch) return
+    const start = value.length - tagMatch[0].length
+    setValue(`${value.slice(0, start)}#${tag} `)
+    setTagActiveIndex(0)
+  }
+
+  function handleInputKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (!showTagDropdown) return
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setTagActiveIndex((i) => (i + 1) % tagSuggestions.length)
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setTagActiveIndex((i) => (i - 1 + tagSuggestions.length) % tagSuggestions.length)
+    } else if (e.key === 'Enter' || e.key === 'Tab') {
+      e.preventDefault()
+      selectTagSuggestion(tagSuggestions[clampedTagIndex])
+    } else if (e.key === 'Escape') {
+      e.preventDefault()
+      setDismissedTagQuery(tagQuery)
+    }
+  }
 
   function togglePopover(p: Popover) {
     setPopover((prev) => (prev === p ? null : p))
@@ -91,16 +131,46 @@ export const QuickAdd = forwardRef<HTMLInputElement, QuickAddProps>(function Qui
   const hasProject = manualProjectId !== null || Boolean(preview?.projectPath)
 
   return (
-    <form onSubmit={handleSubmit} className="w-full">
+    <form onSubmit={handleSubmit} className="relative w-full">
       <input
         ref={ref}
         type="text"
         value={value}
-        onChange={(e) => setValue(e.target.value)}
+        onChange={(e) => {
+          setValue(e.target.value)
+          setTagActiveIndex(0)
+        }}
+        onKeyDown={handleInputKeyDown}
         placeholder="Add a task…"
         autoComplete="off"
-        className="w-full rounded-2xl border border-quickadd-border bg-quickadd px-4 py-3.5 text-base text-ink placeholder:text-ink/35 shadow-sm outline-none transition-shadow duration-150 focus:border-raspberry/40 focus:ring-2 focus:ring-raspberry/25 dark:text-ink-dark dark:placeholder:text-ink-dark/35"
+        role="combobox"
+        aria-expanded={showTagDropdown}
+        aria-autocomplete="list"
+        className="w-full rounded-2xl border border-quickadd-border bg-quickadd px-4 py-3.5 text-base text-ink placeholder:text-ink/35 shadow-sm outline-none transition-shadow duration-150 focus:border-raspberry/40 focus:ring-2 focus:ring-raspberry/25 dark:text-ink-dark dark:placeholder:text-ink-dark/35 dark:focus:shadow-[0_0_15px_rgba(214,60,122,0.25)]"
       />
+
+      {showTagDropdown && (
+        <div className="absolute bottom-full left-0 z-10 mb-2 w-48 overflow-hidden rounded-xl border border-ink/10 bg-white/95 py-1 shadow-lg backdrop-blur-sm dark:border-white/[0.08] dark:bg-cream-dark/90 dark:backdrop-blur-lg">
+          {tagSuggestions.map((tag, i) => (
+            <button
+              key={tag}
+              type="button"
+              onMouseDown={(e) => {
+                e.preventDefault()
+                selectTagSuggestion(tag)
+              }}
+              className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm transition-colors duration-150 ${
+                i === clampedTagIndex
+                  ? 'bg-raspberry/15 text-raspberry dark:bg-raspberry/20 dark:text-raspberry'
+                  : 'text-ink/70 dark:text-ink-dark/70'
+              }`}
+            >
+              <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: colorForTag(tag) }} />
+              #{tag}
+            </button>
+          ))}
+        </div>
+      )}
 
       {preview &&
         (preview.date || preview.dueDate || preview.projectPath || preview.tags.length > 0 || preview.recurrence) && (

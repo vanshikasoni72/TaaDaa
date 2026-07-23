@@ -1,7 +1,14 @@
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import type { Project, Task } from '../types'
 import type { ParsedQuickAdd } from '../lib/parseQuickAdd'
 import { TaskItem } from './TaskItem'
 import { todayIso } from '../lib/date'
+
+// Note: Upcoming's list stays wrapped in a SortableContext (below) purely so
+// its tasks are still drag-*sources* onto the Calendar/Sidebar drop zones —
+// this view's own sort is strictly chronological by design (see CLAUDE.md),
+// so unlike Today/Home it deliberately never reads a task's `order` field
+// back, and a within-list drag here has no persisted visual effect.
 
 interface UpcomingViewProps {
   tasks: Task[]
@@ -41,19 +48,21 @@ export function UpcomingView({ tasks, projects, onToggle, onDelete, onSnooze, on
         </p>
       ) : (
         <div className="flex flex-col">
-          {upcoming.map((task) => (
-            <TaskItem
-              key={task.id}
-              task={task}
-              projects={projects}
-              subtasks={tasks.filter((t) => t.parentId === task.id)}
-              onToggle={onToggle}
-              onDelete={onDelete}
-              onSnooze={onSnooze}
-              onAddSubtask={onAddSubtask}
-              onEdit={onEditTask}
-            />
-          ))}
+          <SortableContext items={upcoming.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+            {upcoming.map((task) => (
+              <TaskItem
+                key={task.id}
+                task={task}
+                projects={projects}
+                subtasks={tasks.filter((t) => t.parentId === task.id)}
+                onToggle={onToggle}
+                onDelete={onDelete}
+                onSnooze={onSnooze}
+                onAddSubtask={onAddSubtask}
+                onEdit={onEditTask}
+              />
+            ))}
+          </SortableContext>
         </div>
       )}
     </div>

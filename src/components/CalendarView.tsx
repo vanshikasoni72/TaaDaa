@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useDroppable } from '@dnd-kit/core'
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import type { Project, Task } from '../types'
 import type { ParsedQuickAdd } from '../lib/parseQuickAdd'
 import { TaskItem } from './TaskItem'
+import { sortForDisplay } from '../lib/sortTasks'
 import {
   addDays,
   addMonths,
@@ -32,10 +35,20 @@ interface CalendarViewProps {
 }
 
 function heatClass(count: number): string {
-  if (count === 0) return 'bg-ink/5 dark:bg-white/5'
-  if (count <= 2) return 'bg-raspberry/15'
-  if (count <= 4) return 'bg-raspberry/30'
-  return 'bg-raspberry/45'
+  // Dark mode expresses density via the 2px line under the day number
+  // instead (see heatLineOpacity below), so the background wash is forced
+  // flat there — light mode keeps the original wash-by-count behavior.
+  if (count === 0) return 'bg-ink/5 dark:!bg-white/[0.03]'
+  if (count <= 2) return 'bg-raspberry/15 dark:!bg-white/[0.03]'
+  if (count <= 4) return 'bg-raspberry/30 dark:!bg-white/[0.03]'
+  return 'bg-raspberry/45 dark:!bg-white/[0.03]'
+}
+
+function heatLineOpacity(count: number): number {
+  if (count === 0) return 0
+  if (count <= 2) return 0.2
+  if (count <= 5) return 0.6
+  return 1
 }
 
 interface DayInfo {
@@ -61,14 +74,22 @@ function DayCell({ day, projects, isSelected, isToday, showWeekday, maxTitles, c
   const sorted = [...day.dayTasks].sort((a, b) => Number(a.done) - Number(b.done))
   const visible = sorted.slice(0, maxTitles)
   const hiddenCount = sorted.length - visible.length
+  const lineOpacity = heatLineOpacity(day.dayTasks.length)
+  const heavy = day.dayTasks.length >= 6
+
+  const { setNodeRef, isOver } = useDroppable({
+    id: `calendar-day-${day.iso}`,
+    data: { type: 'calendar-day', dateIso: day.iso },
+  })
 
   return (
     <button
+      ref={setNodeRef}
       type="button"
       onClick={onSelect}
       className={`flex flex-col items-stretch gap-1.5 rounded-xl px-2 py-3 text-left transition duration-300 hover:ring-1 hover:ring-ink/10 dark:hover:ring-border ${compact ? 'min-h-[92px] sm:min-h-[112px]' : 'min-h-[112px] sm:min-h-[132px]'} ${
         isSelected ? 'bg-raspberry/20 ring-2 ring-raspberry/50' : heatClass(day.dayTasks.length)
-      } ${day.inCurrentPeriod ? '' : 'opacity-35'}`}
+      } ${day.inCurrentPeriod ? '' : 'opacity-35'} ${isOver ? 'ring-2 ring-inset ring-raspberry' : ''}`}
     >
       {showWeekday && (
         <span className="text-center text-[10px] uppercase tracking-wide text-ink/40 dark:text-ink-dark/40">
@@ -82,6 +103,17 @@ function DayCell({ day, projects, isSelected, isToday, showWeekday, maxTitles, c
       >
         {day.date.getDate()}
       </span>
+
+      {lineOpacity > 0 && (
+        <span
+          className="mx-auto hidden h-[2px] w-8 shrink-0 rounded-full dark:block"
+          style={{
+            backgroundColor: 'var(--color-raspberry)',
+            opacity: lineOpacity,
+            boxShadow: heavy ? '0 0 6px var(--color-raspberry)' : undefined,
+          }}
+        />
+      )}
 
       <div className="mt-0.5 flex flex-col gap-0.5 overflow-hidden">
         {visible.map((task) => (
@@ -305,19 +337,26 @@ export function CalendarView({
           </p>
         ) : (
           <div className="flex flex-col">
-            {selectedDay.dayTasks.map((task) => (
-              <TaskItem
-                key={task.id}
-                task={task}
-                projects={projects}
-                subtasks={tasks.filter((t) => t.parentId === task.id)}
-                onToggle={onToggle}
-                onDelete={onDelete}
-                onSnooze={onSnooze}
-                onAddSubtask={onAddSubtask}
-                onEdit={onEditTask}
-              />
-            ))}
+            {(() => {
+              const displayTasks = sortForDisplay(selectedDay.dayTasks)
+              return (
+                <SortableContext items={displayTasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+                  {displayTasks.map((task) => (
+                    <TaskItem
+                      key={task.id}
+                      task={task}
+                      projects={projects}
+                      subtasks={tasks.filter((t) => t.parentId === task.id)}
+                      onToggle={onToggle}
+                      onDelete={onDelete}
+                      onSnooze={onSnooze}
+                      onAddSubtask={onAddSubtask}
+                      onEdit={onEditTask}
+                    />
+                  ))}
+                </SortableContext>
+              )
+            })()}
           </div>
         )}
       </div>

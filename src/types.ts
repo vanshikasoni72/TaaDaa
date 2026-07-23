@@ -42,4 +42,6 @@ export interface Task {
   /** One level deep only: a subtask's own parentId is never itself set to another subtask. */
   parentId: string | null
   createdAt: number
+  /** Manual position within whichever list it was last drag-reordered in; null until touched, falls back to that list's default sort. */
+  order: number | null
 }

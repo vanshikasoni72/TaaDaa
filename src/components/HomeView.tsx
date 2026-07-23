@@ -1,8 +1,10 @@
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import type { Project, Task } from '../types'
 import type { ParsedQuickAdd } from '../lib/parseQuickAdd'
 import { TaskItem } from './TaskItem'
 import { addDays, todayIso, toIsoDate } from '../lib/date'
 import { displayColorFor } from '../lib/projectColors'
+import { sortForDisplay } from '../lib/sortTasks'
 
 interface HomeViewProps {
   tasks: Task[]
@@ -29,6 +31,7 @@ interface GroupProps {
 
 function Group({ title, color, tasks, allTasks, projects, onToggle, onDelete, onSnooze, onAddSubtask, onEditTask }: GroupProps) {
   if (tasks.length === 0) return null
+  const displayTasks = sortForDisplay(tasks)
   return (
     <div>
       <h2 className="mb-1 flex items-center gap-2 px-3 font-serif text-sm italic text-ink/50 dark:text-ink-dark/50">
@@ -37,19 +40,21 @@ function Group({ title, color, tasks, allTasks, projects, onToggle, onDelete, on
         <span className="text-ink/30 dark:text-ink-dark/30">({tasks.length})</span>
       </h2>
       <div className="flex flex-col">
-        {tasks.map((task) => (
-          <TaskItem
-            key={task.id}
-            task={task}
-            projects={projects}
-            subtasks={allTasks.filter((t) => t.parentId === task.id)}
-            onToggle={onToggle}
-            onDelete={onDelete}
-            onSnooze={onSnooze}
-            onAddSubtask={onAddSubtask}
-            onEdit={onEditTask}
-          />
-        ))}
+        <SortableContext items={displayTasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+          {displayTasks.map((task) => (
+            <TaskItem
+              key={task.id}
+              task={task}
+              projects={projects}
+              subtasks={allTasks.filter((t) => t.parentId === task.id)}
+              onToggle={onToggle}
+              onDelete={onDelete}
+              onSnooze={onSnooze}
+              onAddSubtask={onAddSubtask}
+              onEdit={onEditTask}
+            />
+          ))}
+        </SortableContext>
       </div>
     </div>
   )

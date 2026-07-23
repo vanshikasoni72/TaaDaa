@@ -1,16 +1,20 @@
 import { useRef, useState } from 'react'
+import { useSortable } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import type { Priority, Project, Task } from '../types'
 import { Checkbox } from './Checkbox'
 import { colorForTag } from '../lib/tags'
 import { displayColorFor } from '../lib/projectColors'
 import { describeRecurrence } from '../lib/recurrence'
 import { parseQuickAdd, type ParsedQuickAdd } from '../lib/parseQuickAdd'
-import { BellIcon, PaperclipIcon } from './icons'
+import { todayIso } from '../lib/date'
+import { BellIcon, GripIcon, PaperclipIcon } from './icons'
 
 interface TaskItemProps {
   task: Task
   projects: Project[]
   subtasks?: Task[]
+  draggable?: boolean
   onToggle: (id: string) => void
   onDelete: (id: string) => void
   onSnooze?: (id: string, days: 1 | 7) => void
@@ -22,6 +26,7 @@ interface TaskRowProps {
   task: Task
   projects: Project[]
   compact?: boolean
+  draggable?: boolean
   onToggle: () => void
   onDelete: () => void
   onSnooze?: (days: 1 | 7) => void
@@ -36,12 +41,26 @@ function priorityColor(p: Priority): string {
 
 const REVEAL_WIDTH = 144
 
-function TaskRow({ task, projects, compact, onToggle, onDelete, onSnooze, onEdit }: TaskRowProps) {
+function TaskRow({ task, projects, compact, draggable = true, onToggle, onDelete, onSnooze, onEdit }: TaskRowProps) {
   const project = task.projectId ? projects.find((p) => p.id === task.projectId) : undefined
   const [dragX, setDragX] = useState(0)
   const [dragging, setDragging] = useState(false)
   const dragStartX = useRef(0)
   const dragStartOffset = useRef(0)
+
+  // dnd-kit's ref/transform go on the OUTER wrapper (below); the swipe-to-
+  // snooze translateX above stays on the INNER row div, so the two drag
+  // systems (library drag-and-drop vs. hand-rolled swipe) never fight over
+  // the same transform.
+  const {
+    attributes,
+    listeners,
+    setNodeRef: setSortableRef,
+    transform,
+    transition: sortTransition,
+    isDragging,
+  } = useSortable({ id: task.id, disabled: !draggable })
+  const sortableStyle = { transform: CSS.Transform.toString(transform), transition: sortTransition }
 
   function close() {
     setDragX(0)
@@ -80,10 +99,25 @@ function TaskRow({ task, projects, compact, onToggle, onDelete, onSnooze, onEdit
     close()
   }
 
-  const dueDatePassed = task.dueDate && !task.done && task.dueDate < new Date().toISOString().slice(0, 10)
+  const today = todayIso()
+  const dueDatePassed = task.dueDate && !task.done && task.dueDate < today
+
+  // Urgency hierarchy (dark mode only, per the neon aesthetic pass): overdue
+  // or due today reads as pure white with a raspberry accent bar; a future
+  // date steps down to muted silver so today stays visually dominant.
+  const isOverdueOrToday =
+    !task.done && ((task.date !== null && task.date <= today) || (task.dueDate !== null && task.dueDate <= today))
+  const isFutureDated =
+    !task.done &&
+    !isOverdueOrToday &&
+    ((task.date !== null && task.date > today) || (task.dueDate !== null && task.dueDate > today))
 
   return (
-    <div className="relative overflow-hidden rounded-xl">
+    <div
+      ref={setSortableRef}
+      style={sortableStyle}
+      className={`relative rounded-xl transition-shadow duration-150 ${isDragging ? 'z-50 overflow-visible opacity-80 shadow-[0_0_20px_rgba(173,19,87,0.25)] dark:shadow-[0_0_20px_rgba(214,60,122,0.45)]' : 'overflow-hidden'} ${isDragging ? 'scale-[1.02]' : ''}`}
+    >
       {onSnooze && (
         <div className="absolute inset-y-1 right-0 flex items-stretch overflow-hidden rounded-xl" style={{ width: REVEAL_WIDTH }}>
           <button
@@ -114,8 +148,29 @@ function TaskRow({ task, projects, compact, onToggle, onDelete, onSnooze, onEdit
         // reveal panel underneath, so any translucent hover background lets
         // that panel show through and visually collide with the row's own
         // content. A solid color-mix keeps the row opaque at every state.
-        className={`group relative flex touch-pan-y items-center gap-3 rounded-xl bg-cream px-3 transition-colors duration-150 hover:bg-[color-mix(in_oklab,var(--color-cream)_97%,var(--color-ink)_3%)] dark:bg-cream-dark dark:hover:bg-[color-mix(in_oklab,var(--color-cream-dark)_96%,white_4%)] ${compact ? 'py-1.5' : 'py-2.5'}`}
+        className={`group relative flex touch-pan-y items-center gap-3 rounded-xl bg-cream px-3 transition-colors duration-150 hover:bg-[color-mix(in_oklab,var(--color-cream)_97%,var(--color-ink)_3%)] dark:bg-cream-dark dark:hover:bg-[color-mix(in_oklab,var(--color-cream-dark)_96%,white_4%)] ${
+          isOverdueOrToday ? 'dark:border-l-2 dark:border-raspberry dark:pl-2.5' : ''
+        } ${compact ? 'py-1.5' : 'py-2.5'}`}
       >
+        {draggable && (
+          <button
+            type="button"
+            {...attributes}
+            {...listeners}
+            // The row itself has its own onPointerDown for swipe-to-snooze;
+            // without stopping propagation here, grabbing the grip would
+            // trigger both that swipe gesture and dnd-kit's drag at once.
+            onPointerDown={(e) => {
+              e.stopPropagation()
+              listeners?.onPointerDown?.(e)
+            }}
+            aria-label={`Drag to reschedule "${task.title}"`}
+            className="hidden shrink-0 cursor-grab touch-none text-ink/25 opacity-0 transition-opacity duration-150 hover:text-ink/50 focus-visible:opacity-100 group-hover:opacity-100 active:cursor-grabbing sm:block dark:text-ink-dark/25 dark:hover:text-ink-dark/60"
+          >
+            <GripIcon />
+          </button>
+        )}
+
         <Checkbox checked={task.done} onChange={onToggle} label={`Mark "${task.title}" done`} />
 
         <div
@@ -126,7 +181,7 @@ function TaskRow({ task, projects, compact, onToggle, onDelete, onSnooze, onEdit
             if (onEdit && (e.key === 'Enter' || e.key === ' ')) onEdit()
           }}
           className={`min-w-0 flex-1 transition-all duration-500 ${onEdit ? 'cursor-pointer' : ''} ${
-            task.done ? 'opacity-40' : 'opacity-100'
+            task.done ? 'opacity-40 dark:opacity-20' : 'opacity-100'
           }`}
         >
           <span className="flex items-center gap-1.5">
@@ -140,7 +195,9 @@ function TaskRow({ task, projects, compact, onToggle, onDelete, onSnooze, onEdit
               </span>
             )}
             <span
-              className={`block truncate ${compact ? 'text-sm' : ''} ${task.done ? 'line-through decoration-ink/50' : ''}`}
+              className={`block truncate ${compact ? 'text-sm' : ''} ${task.done ? 'line-through decoration-ink/50' : ''} ${
+                isOverdueOrToday ? 'dark:text-white dark:font-medium' : isFutureDated ? 'dark:text-[#A1A1AA]' : ''
+              }`}
             >
               {task.title}
             </span>
@@ -168,19 +225,25 @@ function TaskRow({ task, projects, compact, onToggle, onDelete, onSnooze, onEdit
               )}
               {project && (
                 <span
-                  className="flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium dark:!bg-badge-bg dark:!text-badge-text"
+                  className="flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium dark:gap-1.5 dark:rounded-none dark:!bg-transparent dark:px-0 dark:py-0 dark:!text-ink-dark/70"
                   style={{ backgroundColor: `${displayColorFor(project)}22`, color: displayColorFor(project) }}
                 >
+                  {/* Dark mode drops the tinted pill chrome in favor of a plain 6px dot + muted text, per the neon aesthetic pass. */}
+                  <span
+                    className="hidden h-1.5 w-1.5 shrink-0 rounded-full dark:inline-block"
+                    style={{ backgroundColor: displayColorFor(project) }}
+                  />
                   @{project.name}
                 </span>
               )}
               {task.tags.map((tag) => (
                 <span
                   key={tag}
-                  className="flex items-center gap-1 text-xs text-ink/60 dark:text-ink-dark/60"
+                  className="tag-pill flex items-center gap-1 text-xs text-ink/60 dark:text-ink-dark/60"
+                  style={{ '--tag-color': colorForTag(tag) } as React.CSSProperties}
                 >
                   <span
-                    className="h-1.5 w-1.5 rounded-full"
+                    className="h-1.5 w-1.5 rounded-full dark:hidden"
                     style={{ backgroundColor: colorForTag(tag) }}
                   />
                   #{tag}
@@ -235,7 +298,17 @@ function TaskRow({ task, projects, compact, onToggle, onDelete, onSnooze, onEdit
   )
 }
 
-export function TaskItem({ task, projects, subtasks = [], onToggle, onDelete, onSnooze, onAddSubtask, onEdit }: TaskItemProps) {
+export function TaskItem({
+  task,
+  projects,
+  subtasks = [],
+  draggable = true,
+  onToggle,
+  onDelete,
+  onSnooze,
+  onAddSubtask,
+  onEdit,
+}: TaskItemProps) {
   const [addingSubtask, setAddingSubtask] = useState(false)
   const [subtaskValue, setSubtaskValue] = useState('')
 
@@ -255,6 +328,7 @@ export function TaskItem({ task, projects, subtasks = [], onToggle, onDelete, on
       <TaskRow
         task={task}
         projects={projects}
+        draggable={draggable}
         onToggle={() => onToggle(task.id)}
         onDelete={() => onDelete(task.id)}
         onSnooze={onSnooze ? (days) => onSnooze(task.id, days) : undefined}
@@ -268,6 +342,7 @@ export function TaskItem({ task, projects, subtasks = [], onToggle, onDelete, on
               key={sub.id}
               task={sub}
               projects={projects}
+              draggable={false}
               compact
               onToggle={() => onToggle(sub.id)}
               onDelete={() => onDelete(sub.id)}

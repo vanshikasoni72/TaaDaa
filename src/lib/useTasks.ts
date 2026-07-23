@@ -50,6 +50,7 @@ export function useTasks() {
       parentId: input.parentId ?? null,
       done: false,
       createdAt: Date.now(),
+      order: null,
     }
     setTasks((prev) => [...prev, task])
   }, [])
@@ -108,5 +109,23 @@ export function useTasks() {
     )
   }, [])
 
-  return { tasks, addTask, updateTask, toggleTask, deleteTask, restoreTasks, replaceAllTasks, unassignProject }
+  /** Assigns sequential `order` values (0..n-1) to the given task ids, in the order given — drag-reordering within one list writes back the new order this way. Tasks not in `orderedIds` are untouched. */
+  const reorderTasks = useCallback((orderedIds: string[]) => {
+    setTasks((prev) => {
+      const indexOf = new Map(orderedIds.map((id, i) => [id, i]))
+      return prev.map((t) => (indexOf.has(t.id) ? { ...t, order: indexOf.get(t.id)! } : t))
+    })
+  }, [])
+
+  return {
+    tasks,
+    addTask,
+    updateTask,
+    toggleTask,
+    deleteTask,
+    restoreTasks,
+    replaceAllTasks,
+    unassignProject,
+    reorderTasks,
+  }
 }

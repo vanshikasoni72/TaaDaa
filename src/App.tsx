@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
+import { arrayMove } from '@dnd-kit/sortable'
 import { QuickAdd } from './components/QuickAdd'
 import { InboxView } from './components/InboxView'
 import { HomeView } from './components/HomeView'
@@ -18,6 +20,7 @@ import { readSharedText } from './lib/shareTarget'
 import { syncReminders } from './lib/push'
 import { getStoredSyncCode, pullSync, pushSync } from './lib/sync'
 import { todayIso } from './lib/date'
+import { TAG_COLORS } from './lib/tags'
 import type { Task } from './types'
 import type { ViewState } from './lib/viewState'
 
@@ -30,8 +33,17 @@ interface ToastState {
 const TOAST_DURATION_MS = 4500
 
 function App() {
-  const { tasks, addTask, updateTask, toggleTask, deleteTask, restoreTasks, replaceAllTasks, unassignProject } =
-    useTasks()
+  const {
+    tasks,
+    addTask,
+    updateTask,
+    toggleTask,
+    deleteTask,
+    restoreTasks,
+    replaceAllTasks,
+    unassignProject,
+    reorderTasks,
+  } = useTasks()
   const { projects, resolveProjectPath, deleteProject, addProject, renameProject, replaceAllProjects } =
     useProjects()
   const { pref, setTheme } = useTheme()
@@ -42,8 +54,67 @@ function App() {
   const [syncing, setSyncing] = useState(false)
   const [selectedCalendarDate, setSelectedCalendarDate] = useState(todayIso())
   const quickAddRef = useRef<HTMLInputElement>(null)
+  // Dragging a task onto a calendar day sets its work-on date, or (holding
+  // Shift through the drop) its due date instead — mirrors the modifier-key
+  // convention from the spec. DragEndEvent has no reliable modifier-key
+  // field of its own, so this ref is kept current by plain window listeners.
+  const shiftHeldRef = useRef(false)
 
   useQuickAddShortcut(quickAddRef)
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Shift') shiftHeldRef.current = true
+    }
+    function onKeyUp(e: KeyboardEvent) {
+      if (e.key === 'Shift') shiftHeldRef.current = false
+    }
+    window.addEventListener('keydown', onKeyDown)
+    window.addEventListener('keyup', onKeyUp)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('keyup', onKeyUp)
+    }
+  }, [])
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }))
+
+  const existingTags = useMemo(() => {
+    const used = new Set(tasks.flatMap((t) => t.tags))
+    for (const known of Object.keys(TAG_COLORS)) used.add(known)
+    return Array.from(used).sort()
+  }, [tasks])
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event
+    if (!over) return
+    const taskId = String(active.id)
+    const overData = over.data.current as
+      | { type: 'calendar-day'; dateIso: string }
+      | { type: 'sidebar-project'; projectId: string }
+      | undefined
+
+    if (overData?.type === 'calendar-day') {
+      updateTask(taskId, shiftHeldRef.current ? { dueDate: overData.dateIso } : { date: overData.dateIso })
+      return
+    }
+    if (overData?.type === 'sidebar-project') {
+      updateTask(taskId, { projectId: overData.projectId })
+      return
+    }
+
+    // Otherwise, if both sides belong to the same SortableContext, this is a
+    // same-list reorder — persist the new order via each task's `order` field.
+    const activeSortable = (active.data.current as { sortable?: { items: string[] } } | undefined)?.sortable
+    const overSortable = (over.data.current as { sortable?: { items: string[] } } | undefined)?.sortable
+    if (activeSortable && overSortable && active.id !== over.id) {
+      const items = activeSortable.items
+      const oldIndex = items.indexOf(taskId)
+      const newIndex = items.indexOf(String(over.id))
+      if (oldIndex === -1 || newIndex === -1) return
+      reorderTasks(arrayMove(items, oldIndex, newIndex))
+    }
+  }
 
   useEffect(() => {
     const shared = readSharedText()
@@ -304,6 +375,7 @@ function App() {
   }
 
   return (
+    <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
     <div className="flex min-h-svh">
       <aside className="hidden w-56 shrink-0 border-r border-border bg-sidebar sm:block">
         <Sidebar
@@ -373,15 +445,16 @@ function App() {
           )}
         </div>
 
-        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-cream/95 px-4 py-3 backdrop-blur-sm sm:left-56 sm:px-6 dark:bg-cream-dark/95">
+        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-cream/95 px-4 py-3 backdrop-blur-sm sm:left-56 sm:px-6 dark:border-white/[0.08] dark:bg-cream-dark/85 dark:backdrop-blur-lg">
           <div className={`mx-auto w-full ${view.kind === 'calendar' ? 'max-w-5xl' : 'max-w-xl'}`}>
-            <QuickAdd ref={quickAddRef} projects={projects} onAdd={handleAdd} />
+            <QuickAdd ref={quickAddRef} projects={projects} existingTags={existingTags} onAdd={handleAdd} />
           </div>
         </div>
 
         {toast && <Toast key={toast.id} message={toast.message} onUndo={toast.onUndo} />}
       </div>
     </div>
+    </DndContext>
   )
 }
 

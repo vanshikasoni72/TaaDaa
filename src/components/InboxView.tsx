@@ -1,3 +1,4 @@
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import type { Project, Task } from '../types'
 import type { ParsedQuickAdd } from '../lib/parseQuickAdd'
 import { TaskItem } from './TaskItem'
@@ -33,19 +34,21 @@ export function InboxView({ tasks, projects, onToggle, onDelete, onSnooze, onAdd
         </p>
       ) : (
         <div className="flex flex-col">
-          {inbox.map((task) => (
-            <TaskItem
-              key={task.id}
-              task={task}
-              projects={projects}
-              subtasks={tasks.filter((t) => t.parentId === task.id)}
-              onToggle={onToggle}
-              onDelete={onDelete}
-              onSnooze={onSnooze}
-              onAddSubtask={onAddSubtask}
-              onEdit={onEditTask}
-            />
-          ))}
+          <SortableContext items={inbox.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+            {inbox.map((task) => (
+              <TaskItem
+                key={task.id}
+                task={task}
+                projects={projects}
+                subtasks={tasks.filter((t) => t.parentId === task.id)}
+                onToggle={onToggle}
+                onDelete={onDelete}
+                onSnooze={onSnooze}
+                onAddSubtask={onAddSubtask}
+                onEdit={onEditTask}
+              />
+            ))}
+          </SortableContext>
         </div>
       )}
     </div>

@@ -71,3 +71,18 @@ export function FolderIcon({ size = 16, className }: IconProps) {
     </svg>
   )
 }
+
+/** Drag handle — two columns of dots, the conventional ⋮⋮ grip glyph. */
+export function GripIcon({ size = 14, className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} className={className} fill="currentColor">
+      <circle cx="9" cy="5" r="1.5" />
+      <circle cx="9" cy="12" r="1.5" />
+      <circle cx="9" cy="19" r="1.5" />
+      <circle cx="15" cy="5" r="1.5" />
+      <circle cx="15" cy="12" r="1.5" />
+      <circle cx="15" cy="19" r="1.5" />
+    </svg>
+  )
+}
+

@@ -87,6 +87,26 @@ body {
   background-image: radial-gradient(circle, rgba(232, 232, 237, 0.05) 1px, transparent 1px);
 }
 
+/* Tag pills: in light mode this class is inert (just a plain inline-flex row,
+   dot + text — unchanged Raspberry Moon look). In dark mode it becomes a soft
+   glowing pill, colored per-tag via the `--tag-color` custom property each
+   tag span sets inline (colorForTag's hex can't be expressed as a static
+   Tailwind class, so it's threaded through this one CSS custom property
+   instead). Dark-mode-only per the aesthetic pass — never applies in light. */
+.tag-pill {
+  transition:
+    background-color 150ms,
+    box-shadow 150ms;
+}
+
+.dark .tag-pill {
+  border-radius: 9999px;
+  padding: 0.1rem 0.55rem;
+  background: color-mix(in oklab, var(--tag-color) 22%, transparent);
+  box-shadow: 0 0 8px color-mix(in oklab, var(--tag-color) 45%, transparent);
+  color: var(--tag-color);
+}
+
 /* Motion tiers used throughout: 150ms hover/focus feedback, 300ms discrete
    state changes (selection, checkbox, toasts), 500ms deliberate emphasis
    (task-completion fade). These two keyframes are the deliberate exceptions

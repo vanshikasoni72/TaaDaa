@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useDroppable } from '@dnd-kit/core'
 import type { Project, Task } from '../types'
 import { displayColorFor } from '../lib/projectColors'
 import type { ViewState } from '../lib/viewState'
@@ -34,6 +35,32 @@ function isSameView(a: ViewState, b: ViewState): boolean {
   if (a.kind !== b.kind) return false
   if (a.kind === 'project' && b.kind === 'project') return a.projectId === b.projectId
   return true
+}
+
+/** Makes a project row a drag-and-drop target — dropping a task here reassigns its projectId. */
+function ProjectDropZone({
+  projectId,
+  className,
+  children,
+}: {
+  projectId: string
+  className: string
+  children: React.ReactNode
+}) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: `sidebar-project-${projectId}`,
+    data: { type: 'sidebar-project', projectId },
+  })
+  return (
+    <div
+      ref={setNodeRef}
+      className={`rounded-lg transition-shadow duration-150 ${className} ${
+        isOver ? 'ring-2 ring-inset ring-raspberry dark:animate-pulse' : ''
+      }`}
+    >
+      {children}
+    </div>
+  )
 }
 
 export function Sidebar({
@@ -134,7 +161,7 @@ export function Sidebar({
 
             return (
               <div key={project.id}>
-                <div className="group flex items-center">
+                <ProjectDropZone projectId={project.id} className="group flex items-center">
                   {subs.length > 0 ? (
                     <button
                       type="button"
@@ -199,14 +226,14 @@ export function Sidebar({
                       </div>
                     </>
                   )}
-                </div>
+                </ProjectDropZone>
 
                 {isExpanded && subs.length > 0 && (
                   <div className="ml-5 flex flex-col gap-0.5">
                     {subs.map((sub) => {
                       const subActive = view.kind === 'project' && view.projectId === sub.id
                       return (
-                        <div key={sub.id} className="group flex items-center">
+                        <ProjectDropZone key={sub.id} projectId={sub.id} className="group flex items-center">
                           {renamingId === sub.id ? (
                             <input
                               autoFocus
@@ -257,7 +284,7 @@ export function Sidebar({
                               </div>
                             </>
                           )}
-                        </div>
+                        </ProjectDropZone>
                       )
                     })}
                   </div>
