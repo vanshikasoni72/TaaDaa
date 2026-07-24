@@ -4,47 +4,13 @@ import { colorForNewProject } from './projectColors'
 
 const STORAGE_KEY = 'taadaa.projects'
 
-function buildSeedProject(name: string, subNames: string[], topLevelCount: number): Project[] {
-  const parent: Project = {
-    id: crypto.randomUUID(),
-    name,
-    color: colorForNewProject(name, topLevelCount),
-    parentId: null,
-    createdAt: Date.now(),
-  }
-  const subs: Project[] = subNames.map((subName) => ({
-    id: crypto.randomUUID(),
-    name: subName,
-    color: parent.color,
-    parentId: parent.id,
-    createdAt: Date.now(),
-  }))
-  return [parent, ...subs]
-}
-
-// Seeding "Personal" happens INSIDE the lazy useState initializer (synchronous,
-// runs once before first render) rather than in a useEffect. Doing it as an
-// effect created a real race: the effect's setProjects and a fast subsequent
-// resolveProjectPath call (e.g. quick-add submitted right after mount) could
-// both read the same stale empty `projects` closure and each create their own
-// "Personal" project, leaving two duplicates in the sidebar. Seeding
-// synchronously before anything else can read `projects` avoids that entirely.
 function loadProjects(): Project[] {
-  let projects: Project[]
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    projects = raw ? (JSON.parse(raw) as Project[]) : []
+    return raw ? (JSON.parse(raw) as Project[]) : []
   } catch {
-    projects = []
+    return []
   }
-
-  const hasPersonal = projects.some((p) => p.parentId === null && p.name.toLowerCase() === 'personal')
-  if (!hasPersonal) {
-    const topLevelCount = projects.filter((p) => p.parentId === null).length
-    projects = [...projects, ...buildSeedProject('Personal', ['Errands', 'Shopping', 'Admin'], topLevelCount)]
-  }
-
-  return projects
 }
 
 export function useProjects() {

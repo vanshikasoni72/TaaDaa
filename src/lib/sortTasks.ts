@@ -1,14 +1,15 @@
 import type { Task } from '../types'
 
-/** Tasks with a manual `order` (set by drag-reordering) sort by it first; everything else keeps whatever order the caller already sorted it into (stable sort). */
-export function sortByOrder(tasks: Task[]): Task[] {
-  return [...tasks].sort((a, b) => (a.order ?? Number.MAX_SAFE_INTEGER) - (b.order ?? Number.MAX_SAFE_INTEGER))
+/** The date that actually drives when a task needs doing: the work-on date if set, else the deadline. */
+export function chronoDate(task: Task): string | null {
+  return task.date ?? task.dueDate ?? null
 }
 
-/** Applies manual order, then stably pushes completed tasks to the end of the list — the "settles to the bottom" behavior on completion. */
-export function sortForDisplay(tasks: Task[]): Task[] {
-  const ordered = sortByOrder(tasks)
-  const notDone = ordered.filter((t) => !t.done)
-  const done = ordered.filter((t) => t.done)
-  return [...notDone, ...done]
+function chronoKey(task: Task): string {
+  return `${chronoDate(task) ?? ''}T${task.time ?? ''}`
+}
+
+/** Earliest doing/deadline date first. Used everywhere a list of tasks is shown, including within each project group in Home — chronological order always wins over any manual drag position. */
+export function sortChronological(tasks: Task[]): Task[] {
+  return [...tasks].sort((a, b) => chronoKey(a).localeCompare(chronoKey(b)))
 }

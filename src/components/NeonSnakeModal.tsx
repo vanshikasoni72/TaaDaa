@@ -5,9 +5,15 @@ interface NeonSnakeModalProps {
 }
 
 const GRID = 20
-const CELL = 18
 const TICK_MS = 110
 const HIGH_SCORE_KEY = 'taadaa.snake.highScore'
+
+// Sized off the viewport so the board fills most of the docked panel's
+// height rather than sitting at a fixed, easy-to-outgrow size.
+function computeCell(): number {
+  const availableH = window.innerHeight - 200
+  return Math.max(16, Math.min(30, Math.floor(availableH / GRID)))
+}
 
 type Point = { x: number; y: number }
 type Direction = 'up' | 'down' | 'left' | 'right'
@@ -21,13 +27,22 @@ function randomCell(exclude: Point[]): Point {
   }
 }
 
+function lerp(a: number, b: number, t: number): number {
+  return a + (b - a) * t
+}
+
 export function NeonSnakeModal({ onClose }: NeonSnakeModalProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [score, setScore] = useState(0)
   const [highScore, setHighScore] = useState(() => Number(localStorage.getItem(HIGH_SCORE_KEY) ?? 0))
   const [gameOver, setGameOver] = useState(false)
+  const [cell] = useState(computeCell)
 
   const snakeRef = useRef<Point[]>([{ x: 10, y: 10 }])
+  // The snake's segment positions from immediately before the most recent
+  // tick — kept so the render loop can lerp each segment from its old spot
+  // to its new one instead of the classic teleport-per-cell jump.
+  const prevSnakeRef = useRef<Point[]>(snakeRef.current)
   const dirRef = useRef<Direction>('right')
   const nextDirRef = useRef<Direction>('right')
   const foodRef = useRef<Point>(randomCell(snakeRef.current))
@@ -65,8 +80,9 @@ export function NeonSnakeModal({ onClose }: NeonSnakeModalProps) {
     if (!canvas) return
     const ctx = canvas.getContext('2d')
     if (!ctx) return
+    const CELL = cell
 
-    function draw() {
+    function draw(fraction: number) {
       if (!ctx) return
       ctx.fillStyle = '#141416'
       ctx.fillRect(0, 0, GRID * CELL, GRID * CELL)
@@ -77,19 +93,28 @@ export function NeonSnakeModal({ onClose }: NeonSnakeModalProps) {
       ctx.fillRect(foodRef.current.x * CELL + 3, foodRef.current.y * CELL + 3, CELL - 6, CELL - 6)
       ctx.shadowBlur = 0
 
-      snakeRef.current.forEach((seg, i) => {
+      const snake = snakeRef.current
+      const prev = prevSnakeRef.current
+      snake.forEach((seg, i) => {
+        // Segment i follows where segment i-1 used to be (classic
+        // follow-the-leader snake motion); the head (i=0) follows its own
+        // previous position instead.
+        const from = i === 0 ? (prev[0] ?? seg) : (prev[i - 1] ?? seg)
+        const x = lerp(from.x, seg.x, fraction)
+        const y = lerp(from.y, seg.y, fraction)
         ctx.fillStyle = i === 0 ? '#D63C7A' : '#E39BC4'
         if (i === 0) {
           ctx.shadowColor = '#D63C7A'
           ctx.shadowBlur = 6
         }
-        ctx.fillRect(seg.x * CELL + 1, seg.y * CELL + 1, CELL - 2, CELL - 2)
+        ctx.fillRect(x * CELL + 1, y * CELL + 1, CELL - 2, CELL - 2)
         ctx.shadowBlur = 0
       })
     }
 
     function tick() {
       if (overRef.current) return
+      prevSnakeRef.current = snakeRef.current
       dirRef.current = nextDirRef.current
       const head = snakeRef.current[0]
       const delta: Record<Direction, Point> = {
@@ -122,20 +147,40 @@ export function NeonSnakeModal({ onClose }: NeonSnakeModalProps) {
         foodRef.current = randomCell(nextSnake)
       }
       snakeRef.current = nextSnake
-      draw()
     }
 
-    draw()
-    const interval = setInterval(tick, TICK_MS)
-    return () => clearInterval(interval)
+    // requestAnimationFrame drives continuous drawing at display refresh
+    // rate; tick() still advances the game state on its own fixed cadence,
+    // but draw() now runs every frame with a fraction (0..1 through the
+    // current tick) so segments glide smoothly instead of jumping cell to
+    // cell.
+    let rafId: number
+    let lastTick = performance.now()
+    function frame(now: number) {
+      if (!overRef.current) {
+        const elapsed = now - lastTick
+        if (elapsed >= TICK_MS) {
+          tick()
+          lastTick = now
+        }
+        const fraction = Math.min(1, (now - lastTick) / TICK_MS)
+        draw(fraction)
+      }
+      rafId = requestAnimationFrame(frame)
+    }
+    draw(1)
+    rafId = requestAnimationFrame(frame)
+
+    return () => cancelAnimationFrame(rafId)
     // deliberately run once on mount only — refs carry mutable game state
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   return (
-    <div className="fixed inset-0 z-50 hidden items-center justify-center bg-black/70 backdrop-blur-md sm:flex">
-      <div className="rounded-2xl border border-white/[0.08] bg-[#141416] p-5 shadow-[0_0_40px_rgba(214,60,122,0.15)]">
-        <div className="mb-3 flex items-center justify-between font-mono text-xs tracking-wider text-white/70">
+    <div className="fixed inset-0 z-50 hidden sm:block">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-y-0 right-0 flex w-full max-w-xl flex-col items-center justify-center gap-4 border-l border-white/[0.08] bg-[#141416] px-8 py-6 shadow-[-30px_0_60px_rgba(0,0,0,0.45)]">
+        <div className="flex w-full max-w-fit items-center justify-between gap-6 font-mono text-xs tracking-wider text-white/70">
           <span>
             SCORE: {String(score).padStart(4, '0')} | HIGH: {String(highScore).padStart(4, '0')}
           </span>
@@ -150,12 +195,12 @@ export function NeonSnakeModal({ onClose }: NeonSnakeModalProps) {
         </div>
         <canvas
           ref={canvasRef}
-          width={GRID * CELL}
-          height={GRID * CELL}
-          className="rounded-md border border-[#D63C7A]"
+          width={GRID * cell}
+          height={GRID * cell}
+          className="rounded-md border border-[#D63C7A] shadow-[0_0_30px_rgba(214,60,122,0.2)]"
         />
         {gameOver && (
-          <p className="mt-3 text-center font-mono text-xs tracking-wider text-white/50">game over — esc to close</p>
+          <p className="text-center font-mono text-xs tracking-wider text-white/50">game over — esc to close</p>
         )}
       </div>
     </div>

@@ -392,7 +392,7 @@ function App() {
 
   return (
     <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-    <div className="flex min-h-svh">
+    <div className="flex h-svh overflow-hidden">
       <aside className="hidden w-56 shrink-0 border-r border-border bg-sidebar sm:block">
         <Sidebar
           projects={projects}
@@ -430,8 +430,8 @@ function App() {
         </div>
       )}
 
-      <div className="flex w-full flex-1 flex-col">
-        <div className={`mx-auto w-full flex-1 px-4 pb-28 pt-8 sm:px-6 ${view.kind === 'calendar' ? 'max-w-5xl' : 'max-w-xl'}`}>
+      <div className="flex min-h-0 w-full flex-1 flex-col">
+        <div className={`mx-auto w-full min-h-0 flex-1 overflow-y-auto px-4 pb-28 pt-8 sm:px-6 ${view.kind === 'calendar' ? 'max-w-5xl' : 'max-w-xl'}`}>
           <div className="mb-6 flex items-center justify-between">
             <button
               type="button"

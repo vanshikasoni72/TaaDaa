@@ -32,7 +32,7 @@ export function UpcomingView({ tasks, projects, onToggle, onDelete, onSnooze, on
   const today = todayIso()
   const topLevel = tasks.filter((t) => t.parentId === null)
   const upcoming = topLevel
-    .filter((t) => (t.date && t.date > today) || (t.dueDate && t.dueDate > today))
+    .filter((t) => !t.done && ((t.date && t.date > today) || (t.dueDate && t.dueDate > today)))
     .sort((a, b) => upcomingSortKey(a, today).localeCompare(upcomingSortKey(b, today)))
 
   return (
@@ -54,7 +54,7 @@ export function UpcomingView({ tasks, projects, onToggle, onDelete, onSnooze, on
                 key={task.id}
                 task={task}
                 projects={projects}
-                subtasks={tasks.filter((t) => t.parentId === task.id)}
+                subtasks={tasks.filter((t) => t.parentId === task.id && !t.done)}
                 onToggle={onToggle}
                 onDelete={onDelete}
                 onSnooze={onSnooze}

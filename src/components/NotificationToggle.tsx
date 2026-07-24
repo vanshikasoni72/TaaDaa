@@ -44,9 +44,6 @@ export function NotificationToggle() {
         <BellIcon size={12} />
         {subscribed ? 'notifications on' : 'enable notifications'}
       </button>
-      <p className="text-[10px] leading-snug text-ink/30 dark:text-ink-dark/30">
-        iOS: only fires once TaaDaa is added to your home screen — not in a regular Safari tab.
-      </p>
     </div>
   )
 }

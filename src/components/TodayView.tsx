@@ -3,7 +3,7 @@ import type { Project, Task } from '../types'
 import type { ParsedQuickAdd } from '../lib/parseQuickAdd'
 import { TaskItem } from './TaskItem'
 import { todayIso } from '../lib/date'
-import { sortForDisplay } from '../lib/sortTasks'
+import { sortChronological } from '../lib/sortTasks'
 
 interface TodayViewProps {
   tasks: Task[]
@@ -29,7 +29,7 @@ interface SectionProps {
 
 function Section({ title, tasks, allTasks, projects, onToggle, onDelete, onSnooze, onAddSubtask, onEditTask }: SectionProps) {
   if (tasks.length === 0) return null
-  const displayTasks = sortForDisplay(tasks)
+  const displayTasks = sortChronological(tasks)
   return (
     <div>
       <h2 className="mb-1 px-3 font-serif text-sm italic text-ink/50 dark:text-ink-dark/50">
@@ -42,7 +42,7 @@ function Section({ title, tasks, allTasks, projects, onToggle, onDelete, onSnooz
               key={task.id}
               task={task}
               projects={projects}
-              subtasks={allTasks.filter((t) => t.parentId === task.id)}
+              subtasks={allTasks.filter((t) => t.parentId === task.id && !t.done)}
               onToggle={onToggle}
               onDelete={onDelete}
               onSnooze={onSnooze}
@@ -81,9 +81,11 @@ export function TodayView({ tasks, projects, onToggle, onDelete, onSnooze, onAdd
     (t) => !t.done && ((t.date && t.date < today) || (t.dueDate && t.dueDate < today)),
   )
   const overdueIds = new Set(overdue.map((t) => t.id))
-  // Today is strictly the work-on date — a pure "what am I doing today" list,
-  // distinct from Upcoming (future) and Home (project-grouped week view).
-  const dueToday = topLevel.filter((t) => t.date === today && !overdueIds.has(t.id))
+  // "today" covers both flavors of today: tasks scheduled to work on today
+  // AND tasks whose deadline is today — either one needs attention today.
+  const dueToday = topLevel.filter(
+    (t) => !t.done && (t.date === today || t.dueDate === today) && !overdueIds.has(t.id),
+  )
 
   if (topLevel.length === 0) {
     return (

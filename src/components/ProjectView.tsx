@@ -3,6 +3,7 @@ import type { Project, Task } from '../types'
 import type { ParsedQuickAdd } from '../lib/parseQuickAdd'
 import { TaskItem } from './TaskItem'
 import { displayColorFor } from '../lib/projectColors'
+import { chronoDate } from '../lib/sortTasks'
 
 interface ProjectViewProps {
   project: Project
@@ -17,13 +18,14 @@ interface ProjectViewProps {
 
 export function ProjectView({ project, tasks, projects, onToggle, onDelete, onSnooze, onAddSubtask, onEditTask }: ProjectViewProps) {
   const projectTasks = tasks
-    .filter((t) => t.projectId === project.id && t.parentId === null)
+    .filter((t) => !t.done && t.projectId === project.id && t.parentId === null)
     .sort((a, b) => {
-      if (a.done !== b.done) return a.done ? 1 : -1
-      if (!a.date && !b.date) return 0
-      if (!a.date) return 1
-      if (!b.date) return -1
-      return a.date.localeCompare(b.date)
+      const aDate = chronoDate(a)
+      const bDate = chronoDate(b)
+      if (!aDate && !bDate) return 0
+      if (!aDate) return 1
+      if (!bDate) return -1
+      return aDate.localeCompare(bDate)
     })
 
   return (
@@ -45,7 +47,7 @@ export function ProjectView({ project, tasks, projects, onToggle, onDelete, onSn
                 key={task.id}
                 task={task}
                 projects={projects}
-                subtasks={tasks.filter((t) => t.parentId === task.id)}
+                subtasks={tasks.filter((t) => t.parentId === task.id && !t.done)}
                 onToggle={onToggle}
                 onDelete={onDelete}
                 onSnooze={onSnooze}

@@ -54,6 +54,19 @@ export function getMonthGridDays(monthDate: Date): Date[] {
   return days
 }
 
+/** "yest" / "today" / "tomorrow", else "dd/mm" — used under task rows instead of a raw ISO date. */
+export function formatRelativeShort(iso: string): string {
+  const today = todayIso()
+  if (iso === today) return 'today'
+  const diffDays = Math.round((fromIsoDate(iso).getTime() - fromIsoDate(today).getTime()) / 86400000)
+  if (diffDays === -1) return 'yest'
+  if (diffDays === 1) return 'tomorrow'
+  const d = fromIsoDate(iso)
+  const dd = String(d.getDate()).padStart(2, '0')
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  return `${dd}/${mm}`
+}
+
 export function formatWeekRange(start: Date, end: Date): string {
   const sameMonth = start.getMonth() === end.getMonth()
   const startLabel = start.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })

@@ -18,7 +18,7 @@ export function InboxView({ tasks, projects, onToggle, onDelete, onSnooze, onAdd
   // gets set, the task belongs to a planning view (Today/Upcoming/Home)
   // instead, not here.
   const inbox = tasks
-    .filter((t) => t.parentId === null && t.projectId === null && t.date === null && t.dueDate === null)
+    .filter((t) => !t.done && t.parentId === null && t.projectId === null && t.date === null && t.dueDate === null)
     .sort((a, b) => b.createdAt - a.createdAt)
 
   return (
@@ -40,7 +40,7 @@ export function InboxView({ tasks, projects, onToggle, onDelete, onSnooze, onAdd
                 key={task.id}
                 task={task}
                 projects={projects}
-                subtasks={tasks.filter((t) => t.parentId === task.id)}
+                subtasks={tasks.filter((t) => t.parentId === task.id && !t.done)}
                 onToggle={onToggle}
                 onDelete={onDelete}
                 onSnooze={onSnooze}

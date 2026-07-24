@@ -6,9 +6,21 @@ interface TetrisModalProps {
 
 const COLS = 10
 const ROWS = 20
-const CELL = 20
 const HIGH_SCORE_KEY = 'taadaa.tetris.highScore'
 const ACCENTS = ['#D63C7A', '#E39BC4', '#4FBDAE']
+// Delayed Auto Shift: holding left/right moves once immediately, then after
+// an initial pause keeps moving on its own at a fast repeat rate — standard
+// Tetris feel, and more consistent than relying on the browser/OS's own key
+// -repeat timing.
+const DAS_DELAY_MS = 170
+const DAS_REPEAT_MS = 50
+
+// Sized off the viewport so the board fills most of the docked panel's
+// height rather than sitting at a fixed, easy-to-outgrow size.
+function computeCell(): number {
+  const availableH = window.innerHeight - 200
+  return Math.max(18, Math.min(34, Math.floor(availableH / ROWS)))
+}
 
 type Matrix = number[][]
 
@@ -100,6 +112,7 @@ export function TetrisModal({ onClose }: TetrisModalProps) {
   const [score, setScore] = useState(0)
   const [highScore, setHighScore] = useState(() => Number(localStorage.getItem(HIGH_SCORE_KEY) ?? 0))
   const [gameOver, setGameOver] = useState(false)
+  const [cell] = useState(computeCell)
 
   const boardRef = useRef(emptyBoard())
   const pieceRef = useRef<Piece>(spawnPiece())
@@ -112,6 +125,7 @@ export function TetrisModal({ onClose }: TetrisModalProps) {
     if (!canvas) return
     const ctx = canvas.getContext('2d')
     if (!ctx) return
+    const CELL = cell
 
     function draw() {
       if (!ctx) return
@@ -156,7 +170,7 @@ export function TetrisModal({ onClose }: TetrisModalProps) {
 
       let cleared = 0
       boardRef.current = boardRef.current.filter((row) => {
-        const full = row.every((cell) => cell !== null)
+        const full = row.every((cellVal) => cellVal !== null)
         if (full) cleared++
         return !full
       })
@@ -192,6 +206,27 @@ export function TetrisModal({ onClose }: TetrisModalProps) {
       draw()
     }
 
+    function moveHorizontal(dir: -1 | 1) {
+      if (overRef.current) return
+      const piece = pieceRef.current
+      if (!collides(boardRef.current, piece.row, piece.col + dir, piece.shape)) {
+        pieceRef.current = { ...piece, col: piece.col + dir }
+        draw()
+      }
+    }
+
+    // Tracks which arrow key (if any) is currently being auto-repeated, plus
+    // the timers driving that repeat — see DAS_DELAY_MS/DAS_REPEAT_MS above.
+    let dasDir: -1 | 1 | null = null
+    let dasTimeout: ReturnType<typeof setTimeout> | undefined
+    let dasInterval: ReturnType<typeof setInterval> | undefined
+
+    function stopDas() {
+      clearTimeout(dasTimeout)
+      clearInterval(dasInterval)
+      dasDir = null
+    }
+
     function handleKey(e: KeyboardEvent) {
       if (e.key === 'Escape') {
         onClose()
@@ -199,13 +234,16 @@ export function TetrisModal({ onClose }: TetrisModalProps) {
       }
       if (overRef.current) return
       const piece = pieceRef.current
-      if (e.key === 'ArrowLeft') {
-        if (!collides(boardRef.current, piece.row, piece.col - 1, piece.shape)) {
-          pieceRef.current = { ...piece, col: piece.col - 1 }
-        }
-      } else if (e.key === 'ArrowRight') {
-        if (!collides(boardRef.current, piece.row, piece.col + 1, piece.shape)) {
-          pieceRef.current = { ...piece, col: piece.col + 1 }
+
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        const dir = e.key === 'ArrowLeft' ? -1 : 1
+        if (!e.repeat) {
+          stopDas()
+          moveHorizontal(dir)
+          dasDir = dir
+          dasTimeout = setTimeout(() => {
+            dasInterval = setInterval(() => moveHorizontal(dasDir!), DAS_REPEAT_MS)
+          }, DAS_DELAY_MS)
         }
       } else if (e.key === 'ArrowDown') {
         if (!collides(boardRef.current, piece.row + 1, piece.col, piece.shape)) {
@@ -228,7 +266,13 @@ export function TetrisModal({ onClose }: TetrisModalProps) {
       draw()
     }
 
+    function handleKeyUp(e: KeyboardEvent) {
+      if (e.key === 'ArrowLeft' && dasDir === -1) stopDas()
+      else if (e.key === 'ArrowRight' && dasDir === 1) stopDas()
+    }
+
     window.addEventListener('keydown', handleKey)
+    window.addEventListener('keyup', handleKeyUp)
     draw()
 
     let cancelled = false
@@ -243,16 +287,19 @@ export function TetrisModal({ onClose }: TetrisModalProps) {
     return () => {
       cancelled = true
       clearTimeout(timeoutId)
+      stopDas()
       window.removeEventListener('keydown', handleKey)
+      window.removeEventListener('keyup', handleKeyUp)
     }
     // deliberately run once on mount only — refs carry mutable game state
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   return (
-    <div className="fixed inset-0 z-50 hidden items-center justify-center bg-black/70 backdrop-blur-md sm:flex">
-      <div className="rounded-2xl border border-white/[0.08] bg-[#141416] p-5 shadow-[0_0_40px_rgba(214,60,122,0.15)]">
-        <div className="mb-3 flex items-center justify-between font-mono text-xs tracking-wider text-white/70">
+    <div className="fixed inset-0 z-50 hidden sm:block">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-y-0 right-0 flex w-full max-w-xl flex-col items-center justify-center gap-4 border-l border-white/[0.08] bg-[#141416] px-8 py-6 shadow-[-30px_0_60px_rgba(0,0,0,0.45)]">
+        <div className="flex w-full max-w-fit items-center justify-between gap-6 font-mono text-xs tracking-wider text-white/70">
           <span>
             SCORE: {String(score).padStart(4, '0')} | HIGH: {String(highScore).padStart(4, '0')}
           </span>
@@ -267,12 +314,12 @@ export function TetrisModal({ onClose }: TetrisModalProps) {
         </div>
         <canvas
           ref={canvasRef}
-          width={COLS * CELL}
-          height={ROWS * CELL}
-          className="rounded-md border border-[#D63C7A]"
+          width={COLS * cell}
+          height={ROWS * cell}
+          className="rounded-md border border-[#D63C7A] shadow-[0_0_30px_rgba(214,60,122,0.2)]"
         />
         {gameOver && (
-          <p className="mt-3 text-center font-mono text-xs tracking-wider text-white/50">game over — esc to close</p>
+          <p className="text-center font-mono text-xs tracking-wider text-white/50">game over — esc to close</p>
         )}
       </div>
     </div>

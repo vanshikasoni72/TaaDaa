@@ -4,7 +4,7 @@ import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import type { Project, Task } from '../types'
 import type { ParsedQuickAdd } from '../lib/parseQuickAdd'
 import { TaskItem } from './TaskItem'
-import { sortForDisplay } from '../lib/sortTasks'
+import { sortChronological } from '../lib/sortTasks'
 import {
   addDays,
   addMonths,
@@ -16,7 +16,6 @@ import {
   todayIso,
   toIsoDate,
 } from '../lib/date'
-import { colorForTag } from '../lib/tags'
 import { useDayNotes } from '../lib/useDayNotes'
 import { NoteIcon } from './icons'
 
@@ -61,7 +60,6 @@ interface DayInfo {
 
 interface DayCellProps {
   day: DayInfo
-  projects: Project[]
   isSelected: boolean
   isToday: boolean
   showWeekday: boolean
@@ -70,8 +68,8 @@ interface DayCellProps {
   onSelect: () => void
 }
 
-function DayCell({ day, projects, isSelected, isToday, showWeekday, maxTitles, compact, onSelect }: DayCellProps) {
-  const sorted = [...day.dayTasks].sort((a, b) => Number(a.done) - Number(b.done))
+function DayCell({ day, isSelected, isToday, showWeekday, maxTitles, compact, onSelect }: DayCellProps) {
+  const sorted = sortChronological(day.dayTasks)
   const visible = sorted.slice(0, maxTitles)
   const hiddenCount = sorted.length - visible.length
   const lineOpacity = heatLineOpacity(day.dayTasks.length)
@@ -116,25 +114,24 @@ function DayCell({ day, projects, isSelected, isToday, showWeekday, maxTitles, c
       )}
 
       <div className="mt-0.5 flex flex-col gap-0.5 overflow-hidden">
-        {visible.map((task) => (
-          <span
-            key={task.id}
-            className={`flex items-center gap-1 text-[11px] leading-tight ${
-              task.done ? 'text-ink/35 line-through dark:text-ink-dark/35' : 'text-ink/80 dark:text-ink-dark/80'
-            }`}
-          >
-            {task.tags[0] && (
-              <span
-                className="h-1.5 w-1.5 shrink-0 rounded-full"
-                style={{ backgroundColor: colorForTag(task.tags[0]) }}
-              />
-            )}
-            <span className="truncate">
-              {task.projectId ? `@${projects.find((p) => p.id === task.projectId)?.name ?? ''} ` : ''}
+        {visible.map((task) => {
+          const isDue = task.dueDate === day.iso
+          const isFun = task.tags.includes('fun')
+          return (
+            <span
+              key={task.id}
+              className={`truncate rounded px-1 text-[11px] leading-tight ${
+                isDue
+                  ? 'text-blue-700 ring-1 ring-inset ring-blue-400 dark:text-blue-300 dark:ring-blue-400/70'
+                  : isFun
+                    ? 'text-raspberry ring-1 ring-inset ring-raspberry/70 dark:text-raspberry-dark dark:ring-raspberry-dark/70'
+                    : 'px-0 text-ink/80 dark:text-ink-dark/80'
+              }`}
+            >
               {task.title}
             </span>
-          </span>
-        ))}
+          )
+        })}
         {hiddenCount > 0 && (
           <span className="text-[11px] text-ink/40 dark:text-ink-dark/40">+{hiddenCount} more</span>
         )}
@@ -176,7 +173,9 @@ export function CalendarView({
   const days: DayInfo[] = useMemo(() => {
     return dates.map((date) => {
       const iso = toIsoDate(date)
-      const dayTasks = tasks.filter((t) => t.date === iso && !t.parentId)
+      // A day's tasks are anything worked-on OR due that day — a due-date-only
+      // task (no work-on date set) still needs to surface on its deadline day.
+      const dayTasks = tasks.filter((t) => !t.parentId && !t.done && (t.date === iso || t.dueDate === iso))
       const tags = Array.from(new Set(dayTasks.flatMap((t) => t.tags))).slice(0, 4)
       const inCurrentPeriod = layout === 'week' || date.getMonth() === monthAnchor.getMonth()
       return { date, iso, dayTasks, tags, inCurrentPeriod }
@@ -292,7 +291,6 @@ export function CalendarView({
           <DayCell
             key={day.iso}
             day={day}
-            projects={projects}
             isSelected={day.iso === selected}
             isToday={day.iso === today}
             showWeekday={layout === 'week'}
@@ -338,7 +336,7 @@ export function CalendarView({
         ) : (
           <div className="flex flex-col">
             {(() => {
-              const displayTasks = sortForDisplay(selectedDay.dayTasks)
+              const displayTasks = sortChronological(selectedDay.dayTasks)
               return (
                 <SortableContext items={displayTasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
                   {displayTasks.map((task) => (
@@ -346,7 +344,7 @@ export function CalendarView({
                       key={task.id}
                       task={task}
                       projects={projects}
-                      subtasks={tasks.filter((t) => t.parentId === task.id)}
+                      subtasks={tasks.filter((t) => t.parentId === task.id && !t.done)}
                       onToggle={onToggle}
                       onDelete={onDelete}
                       onSnooze={onSnooze}

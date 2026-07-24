@@ -7,7 +7,7 @@ import { colorForTag } from '../lib/tags'
 import { displayColorFor } from '../lib/projectColors'
 import { describeRecurrence } from '../lib/recurrence'
 import { parseQuickAdd, type ParsedQuickAdd } from '../lib/parseQuickAdd'
-import { todayIso } from '../lib/date'
+import { formatRelativeShort, todayIso } from '../lib/date'
 import { BellIcon, GripIcon, PaperclipIcon } from './icons'
 
 interface TaskItemProps {
@@ -30,6 +30,7 @@ interface TaskRowProps {
   onToggle: () => void
   onDelete: () => void
   onSnooze?: (days: 1 | 7) => void
+  onAddSubtaskClick?: () => void
   onEdit?: () => void
 }
 
@@ -41,7 +42,17 @@ function priorityColor(p: Priority): string {
 
 const REVEAL_WIDTH = 144
 
-function TaskRow({ task, projects, compact, draggable = true, onToggle, onDelete, onSnooze, onEdit }: TaskRowProps) {
+function TaskRow({
+  task,
+  projects,
+  compact,
+  draggable = true,
+  onToggle,
+  onDelete,
+  onSnooze,
+  onAddSubtaskClick,
+  onEdit,
+}: TaskRowProps) {
   const project = task.projectId ? projects.find((p) => p.id === task.projectId) : undefined
   const [dragX, setDragX] = useState(0)
   const [dragging, setDragging] = useState(false)
@@ -148,9 +159,7 @@ function TaskRow({ task, projects, compact, draggable = true, onToggle, onDelete
         // reveal panel underneath, so any translucent hover background lets
         // that panel show through and visually collide with the row's own
         // content. A solid color-mix keeps the row opaque at every state.
-        className={`group relative flex touch-pan-y items-center gap-3 rounded-xl bg-cream px-3 transition-colors duration-150 hover:bg-[color-mix(in_oklab,var(--color-cream)_97%,var(--color-ink)_3%)] dark:bg-cream-dark dark:hover:bg-[color-mix(in_oklab,var(--color-cream-dark)_96%,white_4%)] ${
-          isOverdueOrToday ? 'dark:border-l-2 dark:border-raspberry dark:pl-2.5' : ''
-        } ${compact ? 'py-1.5' : 'py-2.5'}`}
+        className={`group relative flex touch-pan-y items-center gap-3 rounded-xl bg-cream px-3 transition-colors duration-150 hover:bg-[color-mix(in_oklab,var(--color-cream)_97%,var(--color-ink)_3%)] dark:bg-cream-dark dark:hover:bg-[color-mix(in_oklab,var(--color-cream-dark)_96%,white_4%)] ${compact ? 'py-1.5' : 'py-2.5'}`}
       >
         {draggable && (
           <button
@@ -212,7 +221,7 @@ function TaskRow({ task, projects, compact, draggable = true, onToggle, onDelete
             task.dueDate) && (
             <div className="mt-1 flex flex-wrap items-center gap-2">
               {task.date && (
-                <span className="text-xs text-ink/50 dark:text-ink-dark/50">{task.date}</span>
+                <span className="text-xs text-ink/50 dark:text-ink-dark/50">{formatRelativeShort(task.date)}</span>
               )}
               {task.dueDate && (
                 <span
@@ -220,7 +229,7 @@ function TaskRow({ task, projects, compact, draggable = true, onToggle, onDelete
                     dueDatePassed ? 'bg-magenta/20 text-magenta' : 'text-magenta/80'
                   }`}
                 >
-                  due {task.dueDate}
+                  due {formatRelativeShort(task.dueDate)}
                 </span>
               )}
               {project && (
@@ -282,6 +291,20 @@ function TaskRow({ task, projects, compact, draggable = true, onToggle, onDelete
           </button>
         )}
 
+        {onAddSubtaskClick && (
+          <button
+            type="button"
+            onClick={onAddSubtaskClick}
+            aria-label={`Add subtask to "${task.title}"`}
+            tabIndex={dragX === 0 ? 0 : -1}
+            className={`hidden shrink-0 text-sm text-ink/30 transition-opacity duration-150 hover:text-raspberry focus-visible:opacity-100 sm:block ${
+              dragX === 0 ? 'opacity-0 group-hover:opacity-100' : 'pointer-events-none opacity-0'
+            }`}
+          >
+            +
+          </button>
+        )}
+
         <button
           type="button"
           onClick={onDelete}
@@ -332,6 +355,7 @@ export function TaskItem({
         onToggle={() => onToggle(task.id)}
         onDelete={() => onDelete(task.id)}
         onSnooze={onSnooze ? (days) => onSnooze(task.id, days) : undefined}
+        onAddSubtaskClick={!isSubtask && onAddSubtask ? () => setAddingSubtask(true) : undefined}
         onEdit={onEdit ? () => onEdit(task) : undefined}
       />
 
@@ -367,16 +391,6 @@ export function TaskItem({
             </form>
           )}
         </div>
-      )}
-
-      {!isSubtask && !addingSubtask && onAddSubtask && (
-        <button
-          type="button"
-          onClick={() => setAddingSubtask(true)}
-          className="ml-8 pl-2 text-xs text-ink/30 transition-colors duration-150 hover:text-raspberry dark:text-ink-dark/30"
-        >
-          + subtask
-        </button>
       )}
     </div>
   )

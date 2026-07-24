@@ -4,7 +4,7 @@ import type { ParsedQuickAdd } from '../lib/parseQuickAdd'
 import { TaskItem } from './TaskItem'
 import { addDays, todayIso, toIsoDate } from '../lib/date'
 import { displayColorFor } from '../lib/projectColors'
-import { sortForDisplay } from '../lib/sortTasks'
+import { sortChronological } from '../lib/sortTasks'
 
 interface HomeViewProps {
   tasks: Task[]
@@ -31,7 +31,7 @@ interface GroupProps {
 
 function Group({ title, color, tasks, allTasks, projects, onToggle, onDelete, onSnooze, onAddSubtask, onEditTask }: GroupProps) {
   if (tasks.length === 0) return null
-  const displayTasks = sortForDisplay(tasks)
+  const displayTasks = sortChronological(tasks)
   return (
     <div>
       <h2 className="mb-1 flex items-center gap-2 px-3 font-serif text-sm italic text-ink/50 dark:text-ink-dark/50">
@@ -46,7 +46,7 @@ function Group({ title, color, tasks, allTasks, projects, onToggle, onDelete, on
               key={task.id}
               task={task}
               projects={projects}
-              subtasks={allTasks.filter((t) => t.parentId === task.id)}
+              subtasks={allTasks.filter((t) => t.parentId === task.id && !t.done)}
               onToggle={onToggle}
               onDelete={onDelete}
               onSnooze={onSnooze}
@@ -80,7 +80,7 @@ export function HomeView({ tasks, projects, onToggle, onDelete, onSnooze, onAddS
     .filter((t) => !t.done && t.dueDate && t.dueDate < today)
     .sort((a, b) => a.dueDate!.localeCompare(b.dueDate!))
 
-  const inRange = topLevel.filter((t) => t.date && t.date >= today && t.date <= rangeEnd)
+  const inRange = topLevel.filter((t) => !t.done && t.date && t.date >= today && t.date <= rangeEnd)
 
   const byProject = new Map<string | null, Task[]>()
   for (const task of inRange) {
