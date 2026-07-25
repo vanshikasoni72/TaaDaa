@@ -13,9 +13,9 @@ import { Toast } from './components/Toast'
 import { TaskEditModal } from './components/TaskEditModal'
 import { NeonSnakeModal } from './components/NeonSnakeModal'
 import { TetrisModal } from './components/TetrisModal'
-import { ShoppingDrawer } from './components/ShoppingDrawer'
+import { ListsDrawer } from './components/ListsDrawer'
 import { SearchOverlay } from './components/SearchOverlay'
-import { SnakeIcon, TetrisIcon, ShoppingBagIcon, SearchIcon } from './components/icons'
+import { SnakeIcon, TetrisIcon, ListsIcon, SearchIcon } from './components/icons'
 import { useTasks } from './lib/useTasks'
 import { useProjects } from './lib/useProjects'
 import { useTheme } from './lib/useTheme'
@@ -65,7 +65,7 @@ function App() {
   const [selectedCalendarDate, setSelectedCalendarDate] = useState(todayIso())
   const [isSnakeOpen, setIsSnakeOpen] = useState(false)
   const [isTetrisOpen, setIsTetrisOpen] = useState(false)
-  const [isShoppingOpen, setIsShoppingOpen] = useState(false)
+  const [isListsOpen, setIsListsOpen] = useState(false)
   const [isSearchOpen, setIsSearchOpen] = useState(false)
   const quickAddRef = useRef<HTMLInputElement>(null)
   // Dragging a task onto a calendar day sets its work-on date, or (holding
@@ -533,11 +533,11 @@ function App() {
               </button>
               <button
                 type="button"
-                onClick={() => setIsShoppingOpen(true)}
-                aria-label="Open shopping list"
+                onClick={() => setIsListsOpen(true)}
+                aria-label="Open lists"
                 className="flex h-8 w-8 items-center justify-center rounded-lg text-ink/40 transition-colors duration-150 hover:bg-ink/5 hover:text-ink/70 dark:text-ink-dark/40 dark:hover:bg-white/5 dark:hover:text-ink-dark/70"
               >
-                <ShoppingBagIcon />
+                <ListsIcon />
               </button>
               <button
                 type="button"
@@ -592,7 +592,7 @@ function App() {
 
       {isSnakeOpen && <NeonSnakeModal onClose={() => setIsSnakeOpen(false)} />}
       {isTetrisOpen && <TetrisModal onClose={() => setIsTetrisOpen(false)} />}
-      {isShoppingOpen && <ShoppingDrawer onClose={() => setIsShoppingOpen(false)} />}
+      {isListsOpen && <ListsDrawer onClose={() => setIsListsOpen(false)} />}
       {isSearchOpen && (
         <SearchOverlay
           tasks={tasks}
