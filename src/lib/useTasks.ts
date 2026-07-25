@@ -34,6 +34,25 @@ export function useTasks() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks))
   }, [tasks])
 
+  // If another tab/window on this same device (e.g. the installed PWA plus a
+  // leftover browser tab) writes a newer value, adopt it — otherwise this
+  // tab's own next edit would write its stale in-memory copy back out and
+  // silently erase whatever the other tab just saved. The native `storage`
+  // event only fires in *other* contexts, never the one that made the write,
+  // so this can't loop against the effect above.
+  useEffect(() => {
+    function handleStorage(e: StorageEvent) {
+      if (e.key !== STORAGE_KEY) return
+      try {
+        setTasks(e.newValue ? (JSON.parse(e.newValue) as Task[]) : [])
+      } catch {
+        // ignore a malformed write from another tab
+      }
+    }
+    window.addEventListener('storage', handleStorage)
+    return () => window.removeEventListener('storage', handleStorage)
+  }, [])
+
   const addTask = useCallback((input: AddTaskInput) => {
     const task: Task = {
       id: crypto.randomUUID(),
@@ -51,6 +70,7 @@ export function useTasks() {
       done: false,
       createdAt: Date.now(),
       order: null,
+      completedAt: null,
     }
     setTasks((prev) => [...prev, task])
   }, [])
@@ -81,13 +101,16 @@ export function useTasks() {
       if (!task) return prev
 
       const completing = !task.done
-      const updated = prev.map((t) => (t.id === id ? { ...t, done: !t.done } : t))
+      const updated = prev.map((t) =>
+        t.id === id ? { ...t, done: !t.done, completedAt: completing ? Date.now() : null } : t,
+      )
 
       if (completing && spawnId && task.recurrence && task.date) {
         const next: Task = {
           ...task,
           id: spawnId,
           done: false,
+          completedAt: null,
           date: nextOccurrence(task.date, task.recurrence),
           createdAt: Date.now(),
         }

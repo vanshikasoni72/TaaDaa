@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
 import { arrayMove } from '@dnd-kit/sortable'
 import { QuickAdd } from './components/QuickAdd'
@@ -7,6 +7,7 @@ import { HomeView } from './components/HomeView'
 import { TodayView } from './components/TodayView'
 import { UpcomingView } from './components/UpcomingView'
 import { CalendarView } from './components/CalendarView'
+import { CompletedView } from './components/CompletedView'
 import { ProjectView } from './components/ProjectView'
 import { Sidebar } from './components/Sidebar'
 import { Toast } from './components/Toast'
@@ -14,7 +15,8 @@ import { TaskEditModal } from './components/TaskEditModal'
 import { NeonSnakeModal } from './components/NeonSnakeModal'
 import { TetrisModal } from './components/TetrisModal'
 import { ShoppingDrawer } from './components/ShoppingDrawer'
-import { SnakeIcon, TetrisIcon, ShoppingBagIcon } from './components/icons'
+import { SearchOverlay } from './components/SearchOverlay'
+import { SnakeIcon, TetrisIcon, ShoppingBagIcon, SearchIcon } from './components/icons'
 import { useTasks } from './lib/useTasks'
 import { useProjects } from './lib/useProjects'
 import { useTheme } from './lib/useTheme'
@@ -35,6 +37,11 @@ interface ToastState {
 }
 
 const TOAST_DURATION_MS = 4500
+// A push waits this long after the last tasks/projects change before actually
+// firing — editing a task's title/note auto-saves on every keystroke
+// (TaskEditModal), which used to mean one full sync POST per keystroke.
+const SYNC_DEBOUNCE_MS = 1500
+const SYNC_RETRY_MS = 15000
 
 function App() {
   const {
@@ -60,6 +67,7 @@ function App() {
   const [isSnakeOpen, setIsSnakeOpen] = useState(false)
   const [isTetrisOpen, setIsTetrisOpen] = useState(false)
   const [isShoppingOpen, setIsShoppingOpen] = useState(false)
+  const [isSearchOpen, setIsSearchOpen] = useState(false)
   const quickAddRef = useRef<HTMLInputElement>(null)
   // Dragging a task onto a calendar day sets its work-on date, or (holding
   // Shift through the drop) its due date instead — mirrors the modifier-key
@@ -128,7 +136,14 @@ function App() {
     if (!shared) return
     const parsed = parseQuickAdd(shared)
     const projectId = parsed.projectPath ? resolveProjectPath(parsed.projectPath) : null
-    addTask({ title: parsed.title, date: parsed.date, tags: parsed.tags, recurrence: parsed.recurrence, projectId })
+    addTask({
+      title: parsed.title,
+      date: parsed.date,
+      time: parsed.time,
+      tags: parsed.tags,
+      recurrence: parsed.recurrence,
+      projectId,
+    })
     // deliberately run once on mount only
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -143,46 +158,95 @@ function App() {
     syncReminders(tasks)
   }, [tasks])
 
+  // Gates the push effect below until the initial pull attempt (if any) has
+  // resolved. Without this, both effects fire on mount: the push effect would
+  // fire immediately with whatever stale local tasks/projects this device
+  // already had in localStorage, racing the pull's own in-flight fetch — if
+  // that push reached the server first, it silently clobbered another
+  // device's already-synced data before this device even downloaded it.
+  // That race is what caused "some tasks are randomly missing."
+  const [syncReady, setSyncReady] = useState(false)
+  // 'idle' covers both "never synced" and "synced fine" — the indicator only
+  // has something to say while a push is in flight or has failed, matching
+  // the app's general "no UI chrome unless it's saying something" instinct.
+  // An error stays visible (and keeps quietly retrying in the background)
+  // until it resolves, instead of being swallowed the way pushSync/pullSync's
+  // own try/catch silently swallow a failed fetch.
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'error'>('idle')
+  const tasksRef = useRef(tasks)
+  const projectsRef = useRef(projects)
   useEffect(() => {
+    tasksRef.current = tasks
+    projectsRef.current = projects
+  })
+  const pushTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+
+  // Stable across renders (refs carry the current data) so both the debounce
+  // effect and the online-reconnect handler below can share one push+retry
+  // implementation instead of duplicating it.
+  const attemptPush = useCallback(() => {
     const code = getStoredSyncCode()
     if (!code) return
+    clearTimeout(pushTimerRef.current)
+    setSyncStatus('syncing')
+    pushSync(code, tasksRef.current, projectsRef.current).then((ok) => {
+      if (ok) {
+        setSyncStatus('idle')
+      } else {
+        setSyncStatus('error')
+        pushTimerRef.current = setTimeout(attemptPush, SYNC_RETRY_MS)
+      }
+    })
+  }, [])
+
+  useEffect(() => {
+    const code = getStoredSyncCode()
+    if (!code) {
+      setSyncReady(true)
+      return
+    }
     setSyncing(true)
     pullSync(code).then((data) => {
       if (data) {
         replaceAllTasks(data.tasks)
         replaceAllProjects(data.projects)
+      } else {
+        setSyncStatus('error')
       }
       setSyncing(false)
+      setSyncReady(true)
     })
     // deliberately run once on mount only
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Every tasks/projects change schedules a push after a short idle window
+  // rather than firing immediately — editing a task's title/note auto-saves
+  // on every keystroke (TaskEditModal calls onChange, not onBlur), which used
+  // to mean one full sync POST per keystroke while typing.
   useEffect(() => {
-    const code = getStoredSyncCode()
-    if (!code) return
-    pushSync(code, tasks, projects)
-  }, [tasks, projects])
+    if (!syncReady) return
+    if (!getStoredSyncCode()) return
+    clearTimeout(pushTimerRef.current)
+    pushTimerRef.current = setTimeout(attemptPush, SYNC_DEBOUNCE_MS)
+    return () => clearTimeout(pushTimerRef.current)
+  }, [tasks, projects, syncReady, attemptPush])
 
   // The app itself already works offline (tasks/projects live in
   // localStorage, and the service worker precaches the shell), but a push
   // sync attempt made *while offline* just fails silently and never retries
   // on its own — nothing was watching for connectivity to return. This picks
-  // that back up the moment the browser reports it's online again.
+  // that back up the moment the browser reports it's online again, bypassing
+  // the debounce above since a reconnect is a deliberate one-off trigger, not
+  // a burst of edits to batch.
   useEffect(() => {
     function handleOnline() {
-      syncReminders(tasks)
-      const code = getStoredSyncCode()
-      if (!code) return
-      setSyncing(true)
-      pushSync(code, tasks, projects).finally(() => setSyncing(false))
+      syncReminders(tasksRef.current)
+      attemptPush()
     }
     window.addEventListener('online', handleOnline)
     return () => window.removeEventListener('online', handleOnline)
-    // re-subscribing on every tasks/projects change keeps handleOnline's
-    // closure current, so whenever 'online' actually fires it syncs the
-    // latest state rather than whatever was current at mount
-  }, [tasks, projects])
+  }, [attemptPush])
 
   function handleAdd(submission: QuickAddSubmission) {
     const projectId =
@@ -221,6 +285,7 @@ function App() {
     addTask({
       title: parsed.title,
       date: parsed.date,
+      time: parsed.time,
       dueDate: parsed.dueDate,
       tags: parsed.tags,
       recurrence: parsed.recurrence,
@@ -371,6 +436,18 @@ function App() {
             onEditTask={setEditingTask}
           />
         )
+      case 'completed':
+        return (
+          <CompletedView
+            tasks={tasks}
+            projects={projects}
+            onToggle={handleToggle}
+            onDelete={handleDelete}
+            onSnooze={handleSnooze}
+            onAddSubtask={handleAddSubtask}
+            onEditTask={setEditingTask}
+          />
+        )
       case 'project': {
         const project = projects.find((p) => p.id === view.projectId)
         if (!project) return null
@@ -442,7 +519,20 @@ function App() {
               ☰
             </button>
             <div className="ml-auto flex items-center gap-2">
-              {syncing && <p className="text-xs text-ink/40 dark:text-ink-dark/40">syncing…</p>}
+              {(syncing || syncStatus === 'syncing') && (
+                <p className="text-xs text-ink/40 dark:text-ink-dark/40">syncing…</p>
+              )}
+              {!syncing && syncStatus === 'error' && (
+                <p className="text-xs text-magenta">sync failed, retrying…</p>
+              )}
+              <button
+                type="button"
+                onClick={() => setIsSearchOpen(true)}
+                aria-label="Search tasks"
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-ink/40 transition-colors duration-150 hover:bg-ink/5 hover:text-ink/70 dark:text-ink-dark/40 dark:hover:bg-white/5 dark:hover:text-ink-dark/70"
+              >
+                <SearchIcon />
+              </button>
               <button
                 type="button"
                 onClick={() => setIsShoppingOpen(true)}
@@ -505,6 +595,18 @@ function App() {
       {isSnakeOpen && <NeonSnakeModal onClose={() => setIsSnakeOpen(false)} />}
       {isTetrisOpen && <TetrisModal onClose={() => setIsTetrisOpen(false)} />}
       {isShoppingOpen && <ShoppingDrawer onClose={() => setIsShoppingOpen(false)} />}
+      {isSearchOpen && (
+        <SearchOverlay
+          tasks={tasks}
+          projects={projects}
+          onClose={() => setIsSearchOpen(false)}
+          onToggle={handleToggle}
+          onDelete={handleDelete}
+          onSnooze={handleSnooze}
+          onAddSubtask={handleAddSubtask}
+          onEditTask={setEditingTask}
+        />
+      )}
     </div>
     </DndContext>
   )

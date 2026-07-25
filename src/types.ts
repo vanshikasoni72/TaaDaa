@@ -42,6 +42,8 @@ export interface Task {
   /** One level deep only: a subtask's own parentId is never itself set to another subtask. */
   parentId: string | null
   createdAt: number
+  /** Date.now() of the most recent completion, cleared back to null on un-complete — drives sort order in the Completed view and search results. Absent (undefined) on tasks saved before this field existed; treat the same as null. */
+  completedAt: number | null
   /** Manual position within whichever list it was last drag-reordered in; null until touched, falls back to that list's default sort. */
   order: number | null
 }

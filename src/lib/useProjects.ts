@@ -20,6 +20,22 @@ export function useProjects() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(projects))
   }, [projects])
 
+  // See the matching listener in useTasks.ts — adopts a newer value written
+  // by another tab/window on this device instead of letting this tab's next
+  // edit silently overwrite it with a stale in-memory copy.
+  useEffect(() => {
+    function handleStorage(e: StorageEvent) {
+      if (e.key !== STORAGE_KEY) return
+      try {
+        setProjects(e.newValue ? (JSON.parse(e.newValue) as Project[]) : [])
+      } catch {
+        // ignore a malformed write from another tab
+      }
+    }
+    window.addEventListener('storage', handleStorage)
+    return () => window.removeEventListener('storage', handleStorage)
+  }, [])
+
   /**
    * Resolves a raw "@Project" or "@Project/SubCategory" string into a leaf
    * project id, creating any missing parent/child along the way. One level

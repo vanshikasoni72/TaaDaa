@@ -4,4 +4,5 @@ export type ViewState =
   | { kind: 'today' }
   | { kind: 'upcoming' }
   | { kind: 'calendar' }
+  | { kind: 'completed' }
   | { kind: 'project'; projectId: string }

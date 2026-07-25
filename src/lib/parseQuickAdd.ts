@@ -1,5 +1,5 @@
 import * as chrono from 'chrono-node'
-import { toIsoDate, todayIso } from './date'
+import { formatTime, toIsoDate, todayIso } from './date'
 import { nextWeekdayOnOrAfter, parseRecurrence } from './recurrence'
 import type { Priority, Recurrence, ReminderRule } from '../types'
 
@@ -8,6 +8,8 @@ export interface ParsedQuickAdd {
   date: string | null
   /** the deadline, parsed from a "due on <date>" / "due by <date>" phrase */
   dueDate: string | null
+  /** "HH:MM", parsed from a phrase like "at 5pm" — pairs with `date`, same as the manual time field */
+  time: string | null
   /** raw "@Project" or "@Project/SubCategory" text, not yet resolved to a project id */
   projectPath: string | null
   tags: string[]
@@ -16,7 +18,6 @@ export interface ParsedQuickAdd {
 
 /** Everything QuickAdd's toolbar can layer on top of the parsed text. */
 export interface QuickAddSubmission extends ParsedQuickAdd {
-  time: string | null
   /** set via the project dropdown; takes precedence over `projectPath` when resolving */
   projectId: string | null
   priority: Priority | null
@@ -88,18 +89,33 @@ export function parseQuickAdd(input: string): ParsedQuickAdd {
   }
 
   let date: string | null = null
+  let time: string | null = null
   const results = chrono
     .parse(maskAmbiguousTimeWords(text), new Date(), { forwardDate: true })
     .filter(hasDateComponent)
   if (results.length > 0) {
     const result = results[0]
     date = toIsoDate(result.start.date())
+    if (result.start.isCertain('hour')) time = formatTime(result.start.date())
     text = text.slice(0, result.index) + text.slice(result.index + result.text.length)
   } else if (recurrence) {
     date = impliedWeekday !== null ? toIsoDate(nextWeekdayOnOrAfter(new Date(), impliedWeekday)) : todayIso()
   }
 
+  // A combined phrase like "tomorrow at 5pm" already got its time above, as
+  // part of the same chrono match as the date. A bare time with no date
+  // ("call mom at 5pm") never passes hasDateComponent, so it's never in
+  // `results` above — try again here, unfiltered, for a certain hour only.
+  if (time === null) {
+    const timeResults = chrono.parse(maskAmbiguousTimeWords(text), new Date(), { forwardDate: true })
+    const timeResult = timeResults.find((r) => r.start.isCertain('hour'))
+    if (timeResult) {
+      time = formatTime(timeResult.start.date())
+      text = text.slice(0, timeResult.index) + text.slice(timeResult.index + timeResult.text.length)
+    }
+  }
+
   const title = text.replace(/\s+/g, ' ').trim()
 
-  return { title, date, dueDate, projectPath, tags, recurrence }
+  return { title, date, dueDate, time, projectPath, tags, recurrence }
 }

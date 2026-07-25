@@ -43,6 +43,12 @@ function heatClass(count: number): string {
   return 'bg-raspberry/45 dark:!bg-white/[0.03]'
 }
 
+// Automatic red flag for exam/test-sounding tasks — no tag or manual step
+// required, just typing one of these words anywhere in the title. Word-bounded
+// so it doesn't fire on unrelated words that merely contain one of these as a
+// substring (e.g. "example" shouldn't match "exam").
+const RED_FLAG_RE = /\b(exams?|quiz(?:zes)?|tests?|internals?)\b/i
+
 function heatLineOpacity(count: number): number {
   if (count === 0) return 0
   if (count <= 2) return 0.2
@@ -116,16 +122,19 @@ function DayCell({ day, isSelected, isToday, showWeekday, maxTitles, compact, on
       <div className="mt-0.5 flex flex-col gap-0.5 overflow-hidden">
         {visible.map((task) => {
           const isDue = task.dueDate === day.iso
+          const isRedFlag = RED_FLAG_RE.test(task.title)
           const isFun = task.tags.includes('fun')
           return (
             <span
               key={task.id}
               className={`truncate rounded px-1 text-[11px] leading-tight ${
-                isDue
-                  ? 'text-blue-700 ring-1 ring-inset ring-blue-400 dark:text-blue-300 dark:ring-blue-400/70'
-                  : isFun
-                    ? 'text-raspberry ring-1 ring-inset ring-raspberry/70 dark:text-raspberry-dark dark:ring-raspberry-dark/70'
-                    : 'px-0 text-ink/80 dark:text-ink-dark/80'
+                isRedFlag
+                  ? 'text-red-700 ring-1 ring-inset ring-red-400 dark:text-red-300 dark:ring-red-400/70'
+                  : isDue
+                    ? 'text-blue-700 ring-1 ring-inset ring-blue-400 dark:text-blue-300 dark:ring-blue-400/70'
+                    : isFun
+                      ? 'text-raspberry ring-1 ring-inset ring-raspberry/70 dark:text-raspberry-dark dark:ring-raspberry-dark/70'
+                      : 'px-0 text-ink/80 dark:text-ink-dark/80'
               }`}
             >
               {task.title}

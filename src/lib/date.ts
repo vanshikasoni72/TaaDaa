@@ -67,6 +67,13 @@ export function formatRelativeShort(iso: string): string {
   return `${dd}/${mm}`
 }
 
+/** "HH:MM", 24-hour, zero-padded — used to turn a chrono-parsed time-of-day into the same format `Task.time` stores. */
+export function formatTime(d: Date): string {
+  const h = String(d.getHours()).padStart(2, '0')
+  const m = String(d.getMinutes()).padStart(2, '0')
+  return `${h}:${m}`
+}
+
 export function formatWeekRange(start: Date, end: Date): string {
   const sameMonth = start.getMonth() === end.getMonth()
   const startLabel = start.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })

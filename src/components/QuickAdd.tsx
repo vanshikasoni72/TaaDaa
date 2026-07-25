@@ -126,7 +126,7 @@ export const QuickAdd = forwardRef<HTMLInputElement, QuickAddProps>(function Qui
       ...preview,
       date: manualDate ?? preview.date,
       dueDate: manualDueDate ?? preview.dueDate,
-      time: manualTime,
+      time: manualTime ?? preview.time,
       projectId: manualProjectId,
       priority: manualPriority,
       reminders: manualReminders,
@@ -137,6 +137,7 @@ export const QuickAdd = forwardRef<HTMLInputElement, QuickAddProps>(function Qui
   }
 
   const effectiveDate = manualDate ?? preview?.date ?? null
+  const effectiveTime = manualTime ?? preview?.time ?? null
   const hasProject = manualProjectId !== null || Boolean(preview?.projectPath)
 
   return (
@@ -182,11 +183,21 @@ export const QuickAdd = forwardRef<HTMLInputElement, QuickAddProps>(function Qui
       )}
 
       {preview &&
-        (preview.date || preview.dueDate || preview.projectPath || preview.tags.length > 0 || preview.recurrence) && (
+        (preview.date ||
+          preview.time ||
+          preview.dueDate ||
+          preview.projectPath ||
+          preview.tags.length > 0 ||
+          preview.recurrence) && (
         <div className="mt-2 flex flex-wrap items-center gap-2 px-1">
           {preview.date && !manualDate && (
             <span className="rounded-full bg-ink/5 px-2 py-0.5 text-xs text-ink/60 dark:bg-white/10 dark:text-ink-dark/60">
               {preview.date}
+            </span>
+          )}
+          {preview.time && !manualTime && (
+            <span className="rounded-full bg-ink/5 px-2 py-0.5 text-xs text-ink/60 dark:bg-white/10 dark:text-ink-dark/60">
+              {preview.time}
             </span>
           )}
           {(manualDueDate ?? preview.dueDate) && (
@@ -231,7 +242,7 @@ export const QuickAdd = forwardRef<HTMLInputElement, QuickAddProps>(function Qui
         >
           <CalendarIcon />
         </button>
-        <button type="button" onClick={() => togglePopover('time')} className={toolbarBtnClass(Boolean(manualTime))} aria-label="Time">
+        <button type="button" onClick={() => togglePopover('time')} className={toolbarBtnClass(Boolean(effectiveTime))} aria-label="Time">
           <ClockIcon />
         </button>
         <button type="button" onClick={() => togglePopover('priority')} className={toolbarBtnClass(Boolean(manualPriority))} aria-label="Priority">

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useDroppable } from '@dnd-kit/core'
 import type { Project, Task } from '../types'
 import { displayColorFor } from '../lib/projectColors'
@@ -8,6 +8,7 @@ import { NotificationToggle } from './NotificationToggle'
 import { SyncSettings } from './SyncSettings'
 import { ThemeToggle } from './ThemeToggle'
 import { exportData } from '../lib/exportData'
+import { applyImport, parseImportFile } from '../lib/importData'
 
 interface SidebarProps {
   projects: Project[]
@@ -29,6 +30,7 @@ const PINNED: { label: string; view: ViewState }[] = [
   { label: 'Today', view: { kind: 'today' } },
   { label: 'Upcoming', view: { kind: 'upcoming' } },
   { label: 'Calendar', view: { kind: 'calendar' } },
+  { label: 'Completed', view: { kind: 'completed' } },
 ]
 
 function isSameView(a: ViewState, b: ViewState): boolean {
@@ -81,6 +83,28 @@ export function Sidebar({
   const [renameValue, setRenameValue] = useState('')
   const [addingProject, setAddingProject] = useState(false)
   const [newProjectName, setNewProjectName] = useState('')
+  const [importError, setImportError] = useState<string | null>(null)
+  const importInputRef = useRef<HTMLInputElement>(null)
+
+  async function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setImportError(null)
+    try {
+      const data = await parseImportFile(file)
+      if (
+        !window.confirm(
+          'This replaces every task, project, and day note on this device with what\'s in that file. Continue?',
+        )
+      ) {
+        return
+      }
+      applyImport(data)
+    } catch (err) {
+      setImportError(err instanceof Error ? err.message : 'Could not read that file.')
+    }
+  }
 
   const topLevel = projects.filter((p) => p.parentId === null)
   const countFor = (projectId: string) => tasks.filter((t) => t.projectId === projectId && !t.done).length
@@ -229,7 +253,7 @@ export function Sidebar({
                 </ProjectDropZone>
 
                 {isExpanded && subs.length > 0 && (
-                  <div className="ml-5 flex flex-col gap-0.5">
+                  <div className="ml-9 flex flex-col gap-0.5">
                     {subs.map((sub) => {
                       const subActive = view.kind === 'project' && view.projectId === sub.id
                       return (
@@ -303,13 +327,32 @@ export function Sidebar({
           onReplaceProjects={onReplaceProjects}
         />
         <NotificationToggle />
-        <button
-          type="button"
-          onClick={() => exportData(tasks, projects)}
-          className="self-start text-xs text-ink/50 transition-colors duration-150 hover:text-raspberry dark:text-ink-dark/50"
-        >
-          export data
-        </button>
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => exportData(tasks, projects)}
+              className="text-xs text-ink/50 transition-colors duration-150 hover:text-raspberry dark:text-ink-dark/50"
+            >
+              export data
+            </button>
+            <button
+              type="button"
+              onClick={() => importInputRef.current?.click()}
+              className="text-xs text-ink/50 transition-colors duration-150 hover:text-raspberry dark:text-ink-dark/50"
+            >
+              import data
+            </button>
+            <input
+              ref={importInputRef}
+              type="file"
+              accept="application/json"
+              onChange={handleImportFile}
+              className="hidden"
+            />
+          </div>
+          {importError && <p className="text-[10px] text-magenta">{importError}</p>}
+        </div>
         <ThemeToggle pref={themePref} onChange={onThemeChange} />
       </div>
     </nav>

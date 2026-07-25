@@ -111,6 +111,15 @@ export function TetrisIcon({ size = 18, className }: IconProps) {
   )
 }
 
+export function SearchIcon({ size = 16, className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} className={className} {...shared}>
+      <circle cx="11" cy="11" r="7" />
+      <path d="m20 20-3.5-3.5" />
+    </svg>
+  )
+}
+
 export function ShoppingBagIcon({ size = 16, className }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" width={size} height={size} className={className} {...shared}>
