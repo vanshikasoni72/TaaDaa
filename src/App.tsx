@@ -18,6 +18,7 @@ import { SearchOverlay } from './components/SearchOverlay'
 import { SnakeIcon, TetrisIcon, ListsIcon, SearchIcon } from './components/icons'
 import { useTasks } from './lib/useTasks'
 import { useProjects } from './lib/useProjects'
+import { useLists } from './lib/useLists'
 import { useTheme } from './lib/useTheme'
 import { useQuickAddShortcut } from './lib/useQuickAddShortcut'
 import { parseQuickAdd, type ParsedQuickAdd, type QuickAddSubmission } from './lib/parseQuickAdd'
@@ -56,6 +57,8 @@ function App() {
   } = useTasks()
   const { projects, resolveProjectPath, deleteProject, addProject, renameProject, replaceAllProjects } =
     useProjects()
+  const { lists, addList, renameList, deleteList, addItem: addListItem, toggleItem: toggleListItem, clearChecked: clearCheckedListItems, replaceAllLists } =
+    useLists()
   const { pref, setTheme } = useTheme()
   const [view, setView] = useState<ViewState>({ kind: 'today' })
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -175,9 +178,11 @@ function App() {
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'error'>('idle')
   const tasksRef = useRef(tasks)
   const projectsRef = useRef(projects)
+  const listsRef = useRef(lists)
   useEffect(() => {
     tasksRef.current = tasks
     projectsRef.current = projects
+    listsRef.current = lists
   })
   const pushTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
@@ -189,7 +194,7 @@ function App() {
     if (!code) return
     clearTimeout(pushTimerRef.current)
     setSyncStatus('syncing')
-    pushSync(code, tasksRef.current, projectsRef.current).then((ok) => {
+    pushSync(code, tasksRef.current, projectsRef.current, listsRef.current).then((ok) => {
       if (ok) {
         setSyncStatus('idle')
       } else {
@@ -210,6 +215,7 @@ function App() {
       if (data) {
         replaceAllTasks(data.tasks)
         replaceAllProjects(data.projects)
+        replaceAllLists(data.lists ?? [])
       } else {
         setSyncStatus('error')
       }
@@ -230,7 +236,7 @@ function App() {
     clearTimeout(pushTimerRef.current)
     pushTimerRef.current = setTimeout(attemptPush, SYNC_DEBOUNCE_MS)
     return () => clearTimeout(pushTimerRef.current)
-  }, [tasks, projects, syncReady, attemptPush])
+  }, [tasks, projects, lists, syncReady, attemptPush])
 
   // The app itself already works offline (tasks/projects live in
   // localStorage, and the service worker precaches the shell), but a push
@@ -474,8 +480,10 @@ function App() {
           tasks={tasks}
           view={view}
           onNavigate={navigate}
+          lists={lists}
           onReplaceTasks={replaceAllTasks}
           onReplaceProjects={replaceAllProjects}
+          onReplaceLists={replaceAllLists}
           onAddProject={addProject}
           onRenameProject={renameProject}
           onDeleteProject={handleDeleteProject}
@@ -493,8 +501,10 @@ function App() {
               tasks={tasks}
               view={view}
               onNavigate={navigate}
+              lists={lists}
               onReplaceTasks={replaceAllTasks}
               onReplaceProjects={replaceAllProjects}
+              onReplaceLists={replaceAllLists}
               onAddProject={addProject}
               onRenameProject={renameProject}
               onDeleteProject={handleDeleteProject}
@@ -592,7 +602,18 @@ function App() {
 
       {isSnakeOpen && <NeonSnakeModal onClose={() => setIsSnakeOpen(false)} />}
       {isTetrisOpen && <TetrisModal onClose={() => setIsTetrisOpen(false)} />}
-      {isListsOpen && <ListsDrawer onClose={() => setIsListsOpen(false)} />}
+      {isListsOpen && (
+        <ListsDrawer
+          lists={lists}
+          addList={addList}
+          renameList={renameList}
+          deleteList={deleteList}
+          addItem={addListItem}
+          toggleItem={toggleListItem}
+          clearChecked={clearCheckedListItems}
+          onClose={() => setIsListsOpen(false)}
+        />
+      )}
       {isSearchOpen && (
         <SearchOverlay
           tasks={tasks}

@@ -11,6 +11,21 @@ export interface ReminderRule {
 
 export type Priority = 1 | 2 | 3
 
+export interface ListItem {
+  id: string
+  text: string
+  checked: boolean
+  createdAt: number
+}
+
+/** A user-created checklist inside the Lists Drawer — independent of Task/Project entirely. */
+export interface TaskList {
+  id: string
+  name: string
+  items: ListItem[]
+  createdAt: number
+}
+
 export interface Project {
   id: string
   name: string

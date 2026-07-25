@@ -1,4 +1,4 @@
-import type { Project, Task } from '../types'
+import type { Project, Task, TaskList } from '../types'
 
 const PUSH_API_URL = import.meta.env.VITE_PUSH_API_URL as string | undefined
 const STORAGE_KEY = 'taadaa.syncCode'
@@ -30,17 +30,19 @@ export function setStoredSyncCode(code: string | null) {
 export interface SyncData {
   tasks: Task[]
   projects: Project[]
+  /** Absent on a blob pushed before Lists synced — treat the same as an empty array. */
+  lists?: TaskList[]
   updatedAt: string
 }
 
 /** Whole-blob replace — simplest sync model, no field-level merge. Last push wins. */
-export async function pushSync(code: string, tasks: Task[], projects: Project[]): Promise<boolean> {
+export async function pushSync(code: string, tasks: Task[], projects: Project[], lists: TaskList[]): Promise<boolean> {
   if (!PUSH_API_URL) return false
   try {
     const res = await fetch(`${PUSH_API_URL}/api/sync/${code}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tasks, projects }),
+      body: JSON.stringify({ tasks, projects, lists }),
     })
     return res.ok
   } catch {

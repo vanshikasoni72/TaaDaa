@@ -1,18 +1,37 @@
 import { useEffect, useState } from 'react'
-import { useLists } from '../lib/useLists'
+import type { TaskList } from '../types'
 
 interface ListsDrawerProps {
+  lists: TaskList[]
+  addList: (name: string) => string | null
+  renameList: (id: string, name: string) => void
+  deleteList: (id: string) => void
+  addItem: (listId: string, text: string) => void
+  toggleItem: (listId: string, itemId: string) => void
+  clearChecked: (listId: string) => void
   onClose: () => void
 }
 
 // Generalized version of the old single-purpose ShoppingDrawer — same slide-in
-// panel, same isolation from the task engine (its own store, useLists), but
-// now holds any number of named checklists instead of one hardcoded shopping
-// list. Two screens inside one drawer: a list-of-lists picker, and a single
-// list's items — swapped via `selectedListId` rather than two components, to
-// keep the open/close animation and backdrop shared.
-export function ListsDrawer({ onClose }: ListsDrawerProps) {
-  const { lists, addList, renameList, deleteList, addItem, toggleItem, clearChecked } = useLists()
+// panel, same isolation from the task engine, but now holds any number of
+// named checklists instead of one hardcoded shopping list. `lists` and its
+// mutators are lifted up to App.tsx (via useLists there) rather than owned
+// here, so cross-device sync can push/pull them the same way it does
+// tasks/projects — this component would otherwise unmount/remount every time
+// the drawer closes, losing any state App.tsx needed to observe continuously.
+// Two screens inside one drawer: a list-of-lists picker, and a single list's
+// items — swapped via `selectedListId` rather than two components, to keep
+// the open/close animation and backdrop shared.
+export function ListsDrawer({
+  lists,
+  addList,
+  renameList,
+  deleteList,
+  addItem,
+  toggleItem,
+  clearChecked,
+  onClose,
+}: ListsDrawerProps) {
   const [open, setOpen] = useState(false)
   const [selectedListId, setSelectedListId] = useState<string | null>(null)
   const [newListName, setNewListName] = useState('')

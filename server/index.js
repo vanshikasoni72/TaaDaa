@@ -70,11 +70,11 @@ app.get('/api/sync/:code', (req, res) => {
 
 app.post('/api/sync/:code', (req, res) => {
   if (!isValidSyncCode(req.params.code)) return res.status(400).json({ error: 'invalid code' })
-  const { tasks, projects } = req.body
+  const { tasks, projects, lists } = req.body
   if (!Array.isArray(tasks) || !Array.isArray(projects)) {
     return res.status(400).json({ error: 'tasks[] and projects[] required' })
   }
-  setSyncData(req.params.code, { tasks, projects })
+  setSyncData(req.params.code, { tasks, projects, lists: Array.isArray(lists) ? lists : [] })
   res.json({ ok: true })
 })
 

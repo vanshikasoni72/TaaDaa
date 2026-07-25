@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { Project, Task } from '../types'
+import type { Project, Task, TaskList } from '../types'
 import {
   generateSyncCode,
   getStoredSyncCode,
@@ -12,11 +12,20 @@ import {
 interface SyncSettingsProps {
   tasks: Task[]
   projects: Project[]
+  lists: TaskList[]
   onReplaceTasks: (tasks: Task[]) => void
   onReplaceProjects: (projects: Project[]) => void
+  onReplaceLists: (lists: TaskList[]) => void
 }
 
-export function SyncSettings({ tasks, projects, onReplaceTasks, onReplaceProjects }: SyncSettingsProps) {
+export function SyncSettings({
+  tasks,
+  projects,
+  lists,
+  onReplaceTasks,
+  onReplaceProjects,
+  onReplaceLists,
+}: SyncSettingsProps) {
   const [code, setCode] = useState(getStoredSyncCode())
   const [joining, setJoining] = useState(false)
   const [joinInput, setJoinInput] = useState('')
@@ -29,7 +38,7 @@ export function SyncSettings({ tasks, projects, onReplaceTasks, onReplaceProject
     setBusy(true)
     setError(null)
     const newCode = generateSyncCode()
-    const ok = await pushSync(newCode, tasks, projects)
+    const ok = await pushSync(newCode, tasks, projects, lists)
     setBusy(false)
     if (!ok) {
       setError("couldn't reach the sync server")
@@ -43,7 +52,11 @@ export function SyncSettings({ tasks, projects, onReplaceTasks, onReplaceProject
     e.preventDefault()
     const trimmed = joinInput.trim().toUpperCase()
     if (!trimmed) return
-    if (!window.confirm('This replaces the tasks on this device with whatever is saved under that code. Continue?')) {
+    if (
+      !window.confirm(
+        'This replaces the tasks, projects, and lists on this device with whatever is saved under that code. Continue?',
+      )
+    ) {
       return
     }
     setBusy(true)
@@ -56,6 +69,7 @@ export function SyncSettings({ tasks, projects, onReplaceTasks, onReplaceProject
     }
     onReplaceTasks(data.tasks)
     onReplaceProjects(data.projects)
+    onReplaceLists(data.lists ?? [])
     setStoredSyncCode(trimmed)
     setCode(trimmed)
     setJoining(false)

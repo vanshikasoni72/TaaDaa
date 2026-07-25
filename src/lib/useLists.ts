@@ -1,18 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-
-export interface ListItem {
-  id: string
-  text: string
-  checked: boolean
-  createdAt: number
-}
-
-export interface TaskList {
-  id: string
-  name: string
-  items: ListItem[]
-  createdAt: number
-}
+import type { TaskList } from '../types'
 
 const STORAGE_KEY = 'taadaa.lists'
 const OLD_SHOPPING_KEY = 'taadaa.shoppingItems'
@@ -124,5 +111,9 @@ export function useLists() {
     )
   }, [])
 
-  return { lists, addList, renameList, deleteList, addItem, toggleItem, clearChecked }
+  const replaceAllLists = useCallback((next: TaskList[]) => {
+    setLists(next)
+  }, [])
+
+  return { lists, addList, renameList, deleteList, addItem, toggleItem, clearChecked, replaceAllLists }
 }

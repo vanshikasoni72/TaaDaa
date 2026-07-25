@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { useDroppable } from '@dnd-kit/core'
-import type { Project, Task } from '../types'
+import type { Project, Task, TaskList } from '../types'
 import { displayColorFor } from '../lib/projectColors'
 import type { ViewState } from '../lib/viewState'
 import type { ThemePref } from '../lib/theme'
@@ -15,8 +15,10 @@ interface SidebarProps {
   tasks: Task[]
   view: ViewState
   onNavigate: (view: ViewState) => void
+  lists: TaskList[]
   onReplaceTasks: (tasks: Task[]) => void
   onReplaceProjects: (projects: Project[]) => void
+  onReplaceLists: (lists: TaskList[]) => void
   onAddProject: (name: string) => void
   onRenameProject: (id: string, name: string) => void
   onDeleteProject: (id: string) => void
@@ -69,8 +71,10 @@ export function Sidebar({
   tasks,
   view,
   onNavigate,
+  lists,
   onReplaceTasks,
   onReplaceProjects,
+  onReplaceLists,
   onAddProject,
   onRenameProject,
   onDeleteProject,
@@ -322,8 +326,10 @@ export function Sidebar({
         <SyncSettings
           tasks={tasks}
           projects={projects}
+          lists={lists}
           onReplaceTasks={onReplaceTasks}
           onReplaceProjects={onReplaceProjects}
+          onReplaceLists={onReplaceLists}
         />
         <NotificationToggle />
         <div className="flex flex-col gap-1">
