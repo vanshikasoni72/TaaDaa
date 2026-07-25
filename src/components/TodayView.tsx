@@ -2,6 +2,7 @@ import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import type { Project, Task } from '../types'
 import type { ParsedQuickAdd } from '../lib/parseQuickAdd'
 import { TaskItem } from './TaskItem'
+import { TaskColumn } from './TaskColumn'
 import { todayIso } from '../lib/date'
 import { sortChronological } from '../lib/sortTasks'
 
@@ -27,6 +28,10 @@ interface SectionProps {
   onEditTask: (task: Task) => void
 }
 
+// "yesterday's problem" stays a single full-width section, not split into
+// Tasks/Deadlines like "today" below — its whole point is being deliberately
+// broad (either date type slipping counts as overdue, see CLAUDE.md), so
+// splitting it would fight that design rather than declutter it.
 function Section({ title, tasks, allTasks, projects, onToggle, onDelete, onSnooze, onAddSubtask, onEditTask }: SectionProps) {
   if (tasks.length === 0) return null
   const displayTasks = sortChronological(tasks)
@@ -81,11 +86,11 @@ export function TodayView({ tasks, projects, onToggle, onDelete, onSnooze, onAdd
     (t) => !t.done && ((t.date && t.date < today) || (t.dueDate && t.dueDate < today)),
   )
   const overdueIds = new Set(overdue.map((t) => t.id))
-  // "today" covers both flavors of today: tasks scheduled to work on today
-  // AND tasks whose deadline is today — either one needs attention today.
-  const dueToday = topLevel.filter(
-    (t) => !t.done && (t.date === today || t.dueDate === today) && !overdueIds.has(t.id),
-  )
+  // "today" splits the same way Upcoming's window does: a Tasks column (work-
+  // on today) and a Deadlines column (due today) — a task that's both shows
+  // in both, since the two dates answer different questions.
+  const tasksToday = topLevel.filter((t) => !t.done && t.date === today && !overdueIds.has(t.id))
+  const deadlinesToday = topLevel.filter((t) => !t.done && t.dueDate === today && !overdueIds.has(t.id))
 
   if (topLevel.length === 0) {
     return (
@@ -98,7 +103,7 @@ export function TodayView({ tasks, projects, onToggle, onDelete, onSnooze, onAdd
     )
   }
 
-  if (overdue.length === 0 && dueToday.length === 0) {
+  if (overdue.length === 0 && tasksToday.length === 0 && deadlinesToday.length === 0) {
     return (
       <div>
         <Header />
@@ -116,7 +121,22 @@ export function TodayView({ tasks, projects, onToggle, onDelete, onSnooze, onAdd
       <Header />
       <div className="flex flex-col gap-6">
         <Section title="yesterday's problem" tasks={overdue} {...sectionProps} />
-        <Section title="today" tasks={dueToday} {...sectionProps} />
+        {(tasksToday.length > 0 || deadlinesToday.length > 0) && (
+          <div className="flex flex-col gap-8 sm:grid sm:grid-cols-2 sm:gap-6">
+            <TaskColumn
+              label="Tasks"
+              emptyLabel="Nothing scheduled today."
+              tasks={sortChronological(tasksToday)}
+              {...sectionProps}
+            />
+            <TaskColumn
+              label="Deadlines"
+              emptyLabel="Nothing due today."
+              tasks={sortChronological(deadlinesToday)}
+              {...sectionProps}
+            />
+          </div>
+        )}
       </div>
     </div>
   )

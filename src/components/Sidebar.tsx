@@ -26,7 +26,6 @@ interface SidebarProps {
 
 const PINNED: { label: string; view: ViewState }[] = [
   { label: 'Inbox', view: { kind: 'inbox' } },
-  { label: 'Home', view: { kind: 'home' } },
   { label: 'Today', view: { kind: 'today' } },
   { label: 'Upcoming', view: { kind: 'upcoming' } },
   { label: 'Calendar', view: { kind: 'calendar' } },

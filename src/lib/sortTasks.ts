@@ -9,7 +9,7 @@ function chronoKey(task: Task): string {
   return `${chronoDate(task) ?? ''}T${task.time ?? ''}`
 }
 
-/** Earliest doing/deadline date first. Used everywhere a list of tasks is shown, including within each project group in Home — chronological order always wins over any manual drag position. */
+/** Earliest doing/deadline date first. Used everywhere a list of tasks is shown — chronological order always wins over any manual drag position. */
 export function sortChronological(tasks: Task[]): Task[] {
   return [...tasks].sort((a, b) => chronoKey(a).localeCompare(chronoKey(b)))
 }

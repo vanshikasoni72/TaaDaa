@@ -6,10 +6,12 @@ import type { Priority, Recurrence, ReminderRule } from '../types'
 export interface ParsedQuickAdd {
   title: string
   date: string | null
-  /** the deadline, parsed from a "due on <date>" / "due by <date>" phrase */
+  /** the deadline, parsed from a "due <date>" / "due on <date>" / "due by <date>" phrase */
   dueDate: string | null
   /** "HH:MM", parsed from a phrase like "at 5pm" — pairs with `date`, same as the manual time field */
   time: string | null
+  /** 1/2/3, parsed from a standalone "!"/"!!"/"!!!" token — see PRIORITY_RE */
+  priority: Priority | null
   /** raw "@Project" or "@Project/SubCategory" text, not yet resolved to a project id */
   projectPath: string | null
   tags: string[]
@@ -20,7 +22,6 @@ export interface ParsedQuickAdd {
 export interface QuickAddSubmission extends ParsedQuickAdd {
   /** set via the project dropdown; takes precedence over `projectPath` when resolving */
   projectId: string | null
-  priority: Priority | null
   reminders: ReminderRule[]
   note: string | null
 }
@@ -28,10 +29,23 @@ export interface QuickAddSubmission extends ParsedQuickAdd {
 const TAG_RE = /#([a-z0-9][a-z0-9-]*)/gi
 const PROJECT_RE = /@([a-z0-9][a-z0-9-]*(?:\/[a-z0-9][a-z0-9-]*)?)/gi
 
-// Only the explicit "due on"/"due by" phrasing triggers a due date — bare
-// "due" alone is too likely to show up in ordinary titles ("pay the fee due
-// to a card issue") to treat as a marker.
-const DUE_MARKER_RE = /\bdue\s+(?:on|by)\s+/i
+// A standalone run of "!" sets priority 1/2/3, clamped at 3 for anything
+// longer — more bangs, higher priority, same direction as the priority scale
+// elsewhere (level 3 is the most intense accent). "Standalone" (bounded by
+// whitespace/start/end, not glued to a word) is deliberate — it's what keeps
+// this from firing on an ordinary exclamatory title like "we won!", where the
+// "!" sits directly against the last word instead of as its own token.
+const PRIORITY_RE = /(^|\s)(!+)(?=\s|$)/
+
+// "due on"/"due by"/bare "due" all work the same way — the "on"/"by" is
+// optional. Bare "due" alone used to be excluded entirely (too likely to show
+// up in ordinary titles like "pay the fee due to a card issue"), but the
+// safety net below already covers that: this regex only marks *where* a due
+// date might start, it doesn't commit to one — chrono still has to find an
+// actual parseable date right after it (`dueResults.length > 0`), or nothing
+// happens and the text is left untouched. "due to a card issue" never finds
+// a date after "due ", so it still falls through safely.
+const DUE_MARKER_RE = /\bdue\s+(?:(?:on|by)\s+)?/i
 
 // chrono treats bare time-of-day words as anchors and can swallow an adjacent
 // relative phrase into a bogus match (e.g. "game night in 3 days" resolves to
@@ -67,6 +81,12 @@ export function parseQuickAdd(input: string): ParsedQuickAdd {
   text = text.replace(PROJECT_RE, (_match, name: string) => {
     if (!projectPath) projectPath = name
     return ''
+  })
+
+  let priority: Priority | null = null
+  text = text.replace(PRIORITY_RE, (_match, lead: string, bangs: string) => {
+    priority = Math.min(bangs.length, 3) as Priority
+    return lead
   })
 
   const { recurrence, impliedWeekday, text: textAfterRecurrence } = parseRecurrence(text)
@@ -117,5 +137,5 @@ export function parseQuickAdd(input: string): ParsedQuickAdd {
 
   const title = text.replace(/\s+/g, ' ').trim()
 
-  return { title, date, dueDate, time, projectPath, tags, recurrence }
+  return { title, date, dueDate, time, priority, projectPath, tags, recurrence }
 }

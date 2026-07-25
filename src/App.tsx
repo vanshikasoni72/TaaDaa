@@ -3,7 +3,6 @@ import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } f
 import { arrayMove } from '@dnd-kit/sortable'
 import { QuickAdd } from './components/QuickAdd'
 import { InboxView } from './components/InboxView'
-import { HomeView } from './components/HomeView'
 import { TodayView } from './components/TodayView'
 import { UpcomingView } from './components/UpcomingView'
 import { CalendarView } from './components/CalendarView'
@@ -58,7 +57,7 @@ function App() {
   const { projects, resolveProjectPath, deleteProject, addProject, renameProject, replaceAllProjects } =
     useProjects()
   const { pref, setTheme } = useTheme()
-  const [view, setView] = useState<ViewState>({ kind: 'home' })
+  const [view, setView] = useState<ViewState>({ kind: 'today' })
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [toast, setToast] = useState<ToastState | null>(null)
   const [editingTask, setEditingTask] = useState<Task | null>(null)
@@ -140,6 +139,7 @@ function App() {
       title: parsed.title,
       date: parsed.date,
       time: parsed.time,
+      priority: parsed.priority,
       tags: parsed.tags,
       recurrence: parsed.recurrence,
       projectId,
@@ -287,6 +287,7 @@ function App() {
       date: parsed.date,
       time: parsed.time,
       dueDate: parsed.dueDate,
+      priority: parsed.priority,
       tags: parsed.tags,
       recurrence: parsed.recurrence,
       projectId,
@@ -308,7 +309,7 @@ function App() {
       : [id, ...projects.filter((p) => p.parentId === id).map((p) => p.id)]
     unassignProject(affectedIds)
     deleteProject(id)
-    if (view.kind === 'project' && affectedIds.includes(view.projectId)) setView({ kind: 'home' })
+    if (view.kind === 'project' && affectedIds.includes(view.projectId)) setView({ kind: 'today' })
   }
 
   function handleToggle(id: string) {
@@ -372,23 +373,20 @@ function App() {
     setMobileMenuOpen(false)
   }
 
+  // Calendar needs real width for its grid; Today and Upcoming both have a
+  // two-column tasks/deadlines split that wants more room than the other,
+  // single-column list views get.
+  function containerWidthClass(kind: ViewState['kind']) {
+    if (kind === 'calendar') return 'max-w-5xl'
+    if (kind === 'today' || kind === 'upcoming') return 'max-w-3xl'
+    return 'max-w-xl'
+  }
+
   function renderMain() {
     switch (view.kind) {
       case 'inbox':
         return (
           <InboxView
-            tasks={tasks}
-            projects={projects}
-            onToggle={handleToggle}
-            onDelete={handleDelete}
-            onSnooze={handleSnooze}
-            onAddSubtask={handleAddSubtask}
-            onEditTask={setEditingTask}
-          />
-        )
-      case 'home':
-        return (
-          <HomeView
             tasks={tasks}
             projects={projects}
             onToggle={handleToggle}
@@ -508,7 +506,7 @@ function App() {
       )}
 
       <div className="flex min-h-0 w-full flex-1 flex-col">
-        <div className={`mx-auto w-full min-h-0 flex-1 overflow-y-auto px-4 pb-28 pt-8 sm:px-6 ${view.kind === 'calendar' ? 'max-w-5xl' : 'max-w-xl'}`}>
+        <div className={`mx-auto w-full min-h-0 flex-1 overflow-y-auto px-4 pb-28 pt-8 sm:px-6 ${containerWidthClass(view.kind)}`}>
           <div className="mb-6 flex items-center justify-between">
             <button
               type="button"
@@ -578,7 +576,7 @@ function App() {
         </div>
 
         <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-cream/95 px-4 py-3 backdrop-blur-sm sm:left-56 sm:px-6 dark:border-white/[0.08] dark:bg-cream-dark/85 dark:backdrop-blur-lg">
-          <div className={`mx-auto w-full ${view.kind === 'calendar' ? 'max-w-5xl' : 'max-w-xl'}`}>
+          <div className={`mx-auto w-full ${containerWidthClass(view.kind)}`}>
             <QuickAdd
               ref={quickAddRef}
               projects={projects}
