@@ -7,6 +7,7 @@ import {
   pullSync,
   pushSync,
   setStoredSyncCode,
+  setSyncBase,
 } from '../lib/sync'
 
 interface SyncSettingsProps {
@@ -38,12 +39,13 @@ export function SyncSettings({
     setBusy(true)
     setError(null)
     const newCode = generateSyncCode()
-    const ok = await pushSync(newCode, tasks, projects, lists)
+    const result = await pushSync(newCode, tasks, projects, lists, null)
     setBusy(false)
-    if (!ok) {
+    if (result.status !== 'ok') {
       setError("couldn't reach the sync server")
       return
     }
+    setSyncBase({ updatedAt: result.updatedAt, tasks, projects, lists })
     setStoredSyncCode(newCode)
     setCode(newCode)
   }
@@ -61,15 +63,17 @@ export function SyncSettings({
     }
     setBusy(true)
     setError(null)
-    const data = await pullSync(trimmed)
+    const pulled = await pullSync(trimmed)
     setBusy(false)
-    if (!data) {
-      setError("couldn't find that code")
+    if (pulled.status !== 'ok') {
+      setError(pulled.status === 'missing' ? "couldn't find that code" : "couldn't reach the sync server")
       return
     }
+    const { data } = pulled
     onReplaceTasks(data.tasks)
     onReplaceProjects(data.projects)
     onReplaceLists(data.lists ?? [])
+    setSyncBase({ updatedAt: data.updatedAt, tasks: data.tasks, projects: data.projects, lists: data.lists ?? [] })
     setStoredSyncCode(trimmed)
     setCode(trimmed)
     setJoining(false)
@@ -77,6 +81,7 @@ export function SyncSettings({
 
   function handleLeave() {
     setStoredSyncCode(null)
+    setSyncBase(null)
     setCode(null)
   }
 

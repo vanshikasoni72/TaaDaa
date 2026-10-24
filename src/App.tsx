@@ -24,7 +24,7 @@ import { useQuickAddShortcut } from './lib/useQuickAddShortcut'
 import { parseQuickAdd, type ParsedQuickAdd, type QuickAddSubmission } from './lib/parseQuickAdd'
 import { readSharedText } from './lib/shareTarget'
 import { syncReminders } from './lib/push'
-import { getStoredSyncCode, pullSync, pushSync } from './lib/sync'
+import { getStoredSyncCode, getSyncBase, mergeSyncData, pullSync, pushSync, sameSyncContent, setSyncBase } from './lib/sync'
 import { todayIso } from './lib/date'
 import { TAG_COLORS } from './lib/tags'
 import type { Task } from './types'
@@ -185,40 +185,87 @@ function App() {
     listsRef.current = lists
   })
   const pushTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const syncInFlightRef = useRef(false)
+  const syncAgainRef = useRef(false)
 
-  // Stable across renders (refs carry the current data) so both the debounce
-  // effect and the online-reconnect handler below can share one push+retry
-  // implementation instead of duplicating it.
-  const attemptPush = useCallback(() => {
+  // One sync round: pull the server's copy, merge in anything another device
+  // changed since this device last synced (against the saved "base" copy, so
+  // edits on both sides survive instead of last-push-wins), then push back if
+  // this device has changes the server doesn't. The server refuses a push made
+  // from an outdated base, in which case this just goes round again.
+  // Stable across renders (refs carry the current data) so the debounce,
+  // foreground, and online-reconnect triggers below all share it.
+  const syncNow = useCallback(async (): Promise<void> => {
     const code = getStoredSyncCode()
     if (!code) return
+    if (syncInFlightRef.current) {
+      syncAgainRef.current = true
+      return
+    }
+    syncInFlightRef.current = true
     clearTimeout(pushTimerRef.current)
     setSyncStatus('syncing')
-    pushSync(code, tasksRef.current, projectsRef.current, listsRef.current).then((ok) => {
-      if (ok) {
-        setSyncStatus('idle')
-      } else {
-        setSyncStatus('error')
-        pushTimerRef.current = setTimeout(attemptPush, SYNC_RETRY_MS)
+    let ok = false
+    try {
+      for (let attempt = 0; attempt < 3 && !ok; attempt++) {
+        let base = getSyncBase()
+        const pulled = await pullSync(code)
+        if (pulled.status === 'error') break
+
+        let local = { tasks: tasksRef.current, projects: projectsRef.current, lists: listsRef.current }
+        if (pulled.status === 'ok' && pulled.data.updatedAt !== base?.updatedAt) {
+          const remote = pulled.data
+          local = mergeSyncData(base, local, remote)
+          replaceAllTasks(local.tasks)
+          replaceAllProjects(local.projects)
+          replaceAllLists(local.lists)
+          tasksRef.current = local.tasks
+          projectsRef.current = local.projects
+          listsRef.current = local.lists
+          base = { updatedAt: remote.updatedAt, tasks: remote.tasks, projects: remote.projects, lists: remote.lists ?? [] }
+          setSyncBase(base)
+        }
+        // 'missing' means the server has nothing under this code (it lost its
+        // data) — this device's copy just becomes the server's again.
+        const serverHasIt = pulled.status === 'ok' && base !== null
+        if (serverHasIt && sameSyncContent(local, base!)) {
+          ok = true
+          break
+        }
+
+        const pushed = await pushSync(code, local.tasks, local.projects, local.lists, serverHasIt ? base!.updatedAt : null)
+        if (pushed.status === 'ok') {
+          setSyncBase({ updatedAt: pushed.updatedAt, ...local })
+          ok = true
+        } else if (pushed.status === 'error') {
+          break
+        }
+        // 'conflict': another device pushed in between — loop and merge again
       }
-    })
+    } finally {
+      syncInFlightRef.current = false
+    }
+    if (ok) {
+      setSyncStatus('idle')
+    } else {
+      setSyncStatus('error')
+      pushTimerRef.current = setTimeout(syncNow, SYNC_RETRY_MS)
+    }
+    if (syncAgainRef.current) {
+      syncAgainRef.current = false
+      void syncNow()
+    }
+    // replaceAll* are stable useCallbacks
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
-    const code = getStoredSyncCode()
-    if (!code) {
+    if (!getStoredSyncCode()) {
       setSyncReady(true)
       return
     }
     setSyncing(true)
-    pullSync(code).then((data) => {
-      if (data) {
-        replaceAllTasks(data.tasks)
-        replaceAllProjects(data.projects)
-        replaceAllLists(data.lists ?? [])
-      } else {
-        setSyncStatus('error')
-      }
+    syncNow().then(() => {
       setSyncing(false)
       setSyncReady(true)
     })
@@ -226,33 +273,42 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Every tasks/projects change schedules a push after a short idle window
-  // rather than firing immediately — editing a task's title/note auto-saves
-  // on every keystroke (TaskEditModal calls onChange, not onBlur), which used
-  // to mean one full sync POST per keystroke while typing.
+  // Every tasks/projects/lists change schedules a sync after a short idle
+  // window rather than firing immediately — editing a task's title/note
+  // auto-saves on every keystroke (TaskEditModal calls onChange, not onBlur),
+  // which used to mean one full sync POST per keystroke while typing.
   useEffect(() => {
     if (!syncReady) return
     if (!getStoredSyncCode()) return
     clearTimeout(pushTimerRef.current)
-    pushTimerRef.current = setTimeout(attemptPush, SYNC_DEBOUNCE_MS)
+    pushTimerRef.current = setTimeout(syncNow, SYNC_DEBOUNCE_MS)
     return () => clearTimeout(pushTimerRef.current)
-  }, [tasks, projects, lists, syncReady, attemptPush])
+  }, [tasks, projects, lists, syncReady, syncNow])
+
+  // The installed app can sit open in the background for days. Without this it
+  // only ever pulled on launch, so coming back to it showed (and then pushed)
+  // a days-old copy. Catch up every time it comes back to the foreground.
+  useEffect(() => {
+    function handleVisible() {
+      if (document.visibilityState === 'visible' && syncReady) void syncNow()
+    }
+    document.addEventListener('visibilitychange', handleVisible)
+    return () => document.removeEventListener('visibilitychange', handleVisible)
+  }, [syncReady, syncNow])
 
   // The app itself already works offline (tasks/projects live in
-  // localStorage, and the service worker precaches the shell), but a push
-  // sync attempt made *while offline* just fails silently and never retries
-  // on its own — nothing was watching for connectivity to return. This picks
-  // that back up the moment the browser reports it's online again, bypassing
-  // the debounce above since a reconnect is a deliberate one-off trigger, not
-  // a burst of edits to batch.
+  // localStorage, and the service worker precaches the shell), but a sync
+  // attempt made *while offline* just fails — this picks it back up the moment
+  // the browser reports it's online again, bypassing the debounce above since
+  // a reconnect is a deliberate one-off trigger, not a burst of edits to batch.
   useEffect(() => {
     function handleOnline() {
       syncReminders(tasksRef.current)
-      attemptPush()
+      void syncNow()
     }
     window.addEventListener('online', handleOnline)
     return () => window.removeEventListener('online', handleOnline)
-  }, [attemptPush])
+  }, [syncNow])
 
   function handleAdd(submission: QuickAddSubmission) {
     const projectId =

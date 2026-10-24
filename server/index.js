@@ -12,6 +12,8 @@ import {
   getSubscription,
   getSyncData,
   setSyncData,
+  initDb,
+  storageMode,
 } from './db.js'
 
 const { VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT, PORT = 4000 } = process.env
@@ -25,9 +27,9 @@ webpush.setVapidDetails(VAPID_SUBJECT || 'mailto:example@example.com', VAPID_PUB
 
 const app = express()
 app.use(cors())
-app.use(express.json())
+app.use(express.json({ limit: '5mb' }))
 
-app.get('/api/health', (_req, res) => res.json({ ok: true }))
+app.get('/api/health', (_req, res) => res.json({ ok: true, storage: storageMode() }))
 
 app.post('/api/subscribe', (req, res) => {
   const subscription = req.body
@@ -44,12 +46,15 @@ app.post('/api/unsubscribe', (req, res) => {
 })
 
 // Replaces the full reminder set for one subscription. Body:
-// { endpoint, reminders: [{ id, title, fireAt (ISO string) }] }
+// { endpoint, subscription?, reminders: [{ id, title, fireAt (ISO string) }] }
+// The client sends its full subscription along every time, so a device the
+// server has forgotten about re-registers itself without the user noticing.
 app.post('/api/reminders', (req, res) => {
-  const { endpoint, reminders } = req.body
+  const { endpoint, subscription, reminders } = req.body
   if (!endpoint || !Array.isArray(reminders)) {
     return res.status(400).json({ error: 'endpoint and reminders[] required' })
   }
+  if (subscription?.endpoint === endpoint) upsertSubscription(subscription)
   replaceReminders(endpoint, reminders)
   res.json({ ok: true, count: reminders.length })
 })
@@ -68,14 +73,23 @@ app.get('/api/sync/:code', (req, res) => {
   res.json(data)
 })
 
+// `baseUpdatedAt` is the version of the blob the uploading device last saw
+// (null if it has never seen one). If the stored blob has moved on since, the
+// upload is refused with the current blob so the device can merge first —
+// otherwise a device left open for days would overwrite everything newer.
+// Older clients that don't send the field at all are still accepted as-is.
 app.post('/api/sync/:code', (req, res) => {
   if (!isValidSyncCode(req.params.code)) return res.status(400).json({ error: 'invalid code' })
-  const { tasks, projects, lists } = req.body
+  const { tasks, projects, lists, baseUpdatedAt } = req.body
   if (!Array.isArray(tasks) || !Array.isArray(projects)) {
     return res.status(400).json({ error: 'tasks[] and projects[] required' })
   }
-  setSyncData(req.params.code, { tasks, projects, lists: Array.isArray(lists) ? lists : [] })
-  res.json({ ok: true })
+  const current = getSyncData(req.params.code)
+  if (current && baseUpdatedAt !== undefined && baseUpdatedAt !== current.updatedAt) {
+    return res.status(409).json({ error: 'stale', current })
+  }
+  const updatedAt = setSyncData(req.params.code, { tasks, projects, lists: Array.isArray(lists) ? lists : [] })
+  res.json({ ok: true, updatedAt })
 })
 
 // Sends a push immediately, bypassing the schedule — handy for testing and for
@@ -98,7 +112,7 @@ async function sendDueReminders() {
     const subscription = getSubscription(reminder.endpoint)
     if (!subscription) {
       // no subscription to deliver to at all — nothing to retry, drop it
-      markSent(reminder.id)
+      markSent(reminder.id, reminder.endpoint)
       continue
     }
     try {
@@ -106,13 +120,12 @@ async function sendDueReminders() {
         subscription,
         JSON.stringify({ title: 'TaaDaa', body: reminder.title }),
       )
-      markSent(reminder.id)
+      markSent(reminder.id, reminder.endpoint)
     } catch (err) {
       // 410 Gone / 404 means the browser unsubscribed or the subscription expired —
       // drop both the subscription and this reminder, retrying won't help.
       if (err.statusCode === 410 || err.statusCode === 404) {
         removeSubscription(reminder.endpoint)
-        markSent(reminder.id)
       } else {
         // Anything else (transient network blip, momentary FCM hiccup) is left
         // unsent on purpose so the next minute's cron tick retries it.
@@ -125,6 +138,8 @@ async function sendDueReminders() {
     }
   }
 }
+
+await initDb()
 
 cron.schedule('* * * * *', sendDueReminders)
 

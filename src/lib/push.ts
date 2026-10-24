@@ -42,6 +42,14 @@ export async function subscribeToPush(): Promise<PushSubscription | null> {
     body: JSON.stringify(subscription),
   })
 
+  // Reminders otherwise only get scheduled on the next task change, so ones
+  // already set on existing tasks wouldn't fire until something got edited.
+  try {
+    await syncReminders(JSON.parse(localStorage.getItem('taadaa.tasks') ?? '[]') as Task[])
+  } catch {
+    // next task change schedules them anyway
+  }
+
   return subscription
 }
 
@@ -63,13 +71,19 @@ export interface ReminderPayload {
   fireAt: string
 }
 
-/** Flattens every not-done task's reminder rules into fire-at timestamps. Tasks with no time default to 09:00 on their due date. */
+/**
+ * Flattens every not-done task's reminder rules into fire-at timestamps,
+ * counted back from the work-on date — or the due date, for a task that only
+ * has a deadline (those used to never remind at all). Tasks with no time
+ * default to 09:00 on that date.
+ */
 export function computeReminderPayloads(tasks: Task[]): ReminderPayload[] {
   const payloads: ReminderPayload[] = []
   for (const task of tasks) {
-    if (task.done || !task.date || task.reminders.length === 0) continue
+    const date = task.date ?? task.dueDate
+    if (task.done || !date || task.reminders.length === 0) continue
     const time = task.time ?? '09:00'
-    const due = new Date(`${task.date}T${time}:00`)
+    const due = new Date(`${date}T${time}:00`)
     for (const rule of task.reminders) {
       const fireAt = new Date(due.getTime() - rule.leadMinutes * 60_000)
       payloads.push({ id: `${task.id}:${rule.leadMinutes}`, title: task.title, fireAt: fireAt.toISOString() })
@@ -85,6 +99,13 @@ export async function syncReminders(tasks: Task[]): Promise<void> {
   await fetch(`${PUSH_API_URL}/api/reminders`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ endpoint: subscription.endpoint, reminders: computeReminderPayloads(tasks) }),
+    // The full subscription rides along so the server re-registers this device
+    // if it has lost track of it (it used to silently drop every reminder for
+    // a device it had forgotten, while the app still showed "notifications on").
+    body: JSON.stringify({
+      endpoint: subscription.endpoint,
+      subscription,
+      reminders: computeReminderPayloads(tasks),
+    }),
   }).catch(() => {})
 }
